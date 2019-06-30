@@ -1,0 +1,16 @@
+language: python
+matrix:
+  include:
+    - name: "python 3.7 Xenial"
+      dist: xenial
+      python: 3.7
+    - name: "python 3.7 Windows"
+      os: windows
+      language: shell       # 'language: python' is an error on Travis CI Windows
+      before_install: choco install python
+      env: PATH=/c/Python37:/c/Python37/Scripts:$PATH
+    - name: "python 3.7 MacOs"
+      os: osx
+      language: shell       # 'language: python' is an error on Travis CI macOS
+install: pip install wheel PyMuPDF pytest
+script: pytest test.py
