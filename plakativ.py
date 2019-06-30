@@ -7,7 +7,7 @@ import fitz
 try:
     import tkinter
     import tkinter.filedialog
-except ModuleNotFoundError:
+except ImportError:
     # dummy classes so that this also loads without tkinter
     class tkinter:
         class Frame:
