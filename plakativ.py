@@ -4,8 +4,18 @@
 from collections import OrderedDict
 import math
 import fitz
-import tkinter
-import tkinter.filedialog
+try:
+    import tkinter
+    import tkinter.filedialog
+except ModuleNotFoundError:
+    # dummy classes so that this also loads without tkinter
+    class tkinter:
+        class Frame:
+            pass
+        class Menubutton:
+            pass
+        class LabelFrame:
+            pass
 import sys
 import argparse
 import os.path
@@ -1058,7 +1068,7 @@ def main():
         gui()
         exit(0)
 
-    compute_layout(args.input, args.output)
+    compute_layout(args.input, args.output, mode="size", size=(297, 420))
 
 if __name__ == "__main__":
     main()
