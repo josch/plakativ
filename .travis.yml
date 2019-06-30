@@ -12,5 +12,5 @@ matrix:
     - name: "python 3.7 MacOs"
       os: osx
       language: shell       # 'language: python' is an error on Travis CI macOS
-install: pip install wheel PyMuPDF pytest
+install: pip install wheel PyMuPDF pytest pdfrw
 script: pytest test.py
