@@ -26,4 +26,5 @@ matrix:
         - source "$HOME/venv/bin/activate"
 install: pip install wheel PyMuPDF pytest pdfrw
 script:
-  - python3 -m pytest test.py
+  - python --version
+  - python -m pytest test.py
