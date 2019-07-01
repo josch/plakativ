@@ -16,16 +16,17 @@ matrix:
         directories:
           - "$HOME/Library/Caches/Homebrew"
           - "$HOME/Library/Caches/pip"
+      addons:
+        homebrew:
+          update: true
+          packages: python3
       before_install:
-        - brew update
-        - brew install tcl-tk
-        - brew install python3 --with-tcl-tk
         - python3 -m pip install --upgrade virtualenv
         - virtualenv -p python3 --system-site-packages "$HOME/venv"
         - source "$HOME/venv/bin/activate"
 install: pip install wheel PyMuPDF pytest pdfrw
 script:
-  - python --version
   - python3 --version
-  - python -c 'import tkinter'
+  - python3 -c 'import tkinter'
+  - python3 -m pytest test.py
   - pytest test.py
