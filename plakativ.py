@@ -4,18 +4,8 @@
 from collections import OrderedDict
 import math
 import fitz
-try:
-    import tkinter
-    import tkinter.filedialog
-except ImportError:
-    # dummy classes so that this also loads without tkinter
-    class tkinter:
-        class Frame:
-            pass
-        class Menubutton:
-            pass
-        class LabelFrame:
-            pass
+import tkinter
+import tkinter.filedialog
 import sys
 import argparse
 import os.path
