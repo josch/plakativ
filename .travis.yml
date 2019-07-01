@@ -18,7 +18,7 @@ matrix:
           - "$HOME/Library/Caches/pip"
       addons:
         homebrew:
-          update: true
+          #update: true
           packages: python3
       before_install:
         - python3 -m pip install --upgrade virtualenv
@@ -26,7 +26,4 @@ matrix:
         - source "$HOME/venv/bin/activate"
 install: pip install wheel PyMuPDF pytest pdfrw
 script:
-  - python3 --version
-  - python3 -c 'import tkinter'
   - python3 -m pytest test.py
-  - pytest test.py
