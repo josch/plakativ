@@ -2,17 +2,17 @@ environment:
   # For Python versions available on Appveyor, see
   # https://www.appveyor.com/docs/windows-images-software/#python
   matrix:
-    - PYTHON: "C:\\Python27"
-    - PYTHON: "C:\\Python33"
-    - PYTHON: "C:\\Python34"
-    - PYTHON: "C:\\Python35"
-    - PYTHON: "C:\\Python36"
-    - PYTHON: "C:\\Python37"
-    - PYTHON: "C:\\Python27-x64"
-    - PYTHON: "C:\\Python33-x64"
-    - PYTHON: "C:\\Python34-x64"
-    - PYTHON: "C:\\Python35-x64"
-    - PYTHON: "C:\\Python36-x64"
+#    - PYTHON: "C:\\Python27"
+#    - PYTHON: "C:\\Python33"
+#    - PYTHON: "C:\\Python34"
+#    - PYTHON: "C:\\Python35"
+#    - PYTHON: "C:\\Python36"
+#    - PYTHON: "C:\\Python37"
+#    - PYTHON: "C:\\Python27-x64"
+#    - PYTHON: "C:\\Python33-x64"
+#    - PYTHON: "C:\\Python34-x64"
+#    - PYTHON: "C:\\Python35-x64"
+#    - PYTHON: "C:\\Python36-x64"
     - PYTHON: "C:\\Python37-x64"
 
 install:
@@ -21,7 +21,7 @@ install:
 build: off
 
 test_script:
-  - "%PYTHON%\\python.exe setup.py test"
+  - "%PYTHON%\\python.exe -m pytest test.py"
 
 after_test:
   - "%PYTHON%\\python.exe setup.py bdist_wheel"
