@@ -49,19 +49,18 @@ class Plakativ:
         assert len(self.doc) == 1
         self.dlist = self.doc[0].getDisplayList()
 
-        self.pagesize = PAGE_SIZES["A4 (21.0 cm × 29.7 cm)"]
         self.border_left = 20
         self.border_right = 20
         self.border_top = 20
         self.border_bottom = 20
         self.config = {
-            "pagesize": (
+            "input_pagesize": (
                 pt_to_mm(self.dlist.rect.width),
                 pt_to_mm(self.dlist.rect.height),
             ),
             "postersize": PAGE_SIZES["A1 (59.4 cm × 84.1 cm)"],
         }
-        self.layout = {"pagesize": PAGE_SIZES["A4 (21.0 cm × 29.7 cm)"]}
+        self.layout = {"output_pagesize": PAGE_SIZES["A4 (21.0 cm × 29.7 cm)"]}
 
     def compute_layout(self, mode, size=None, mult=None, npages=None):
         if self.doc is None:
@@ -80,10 +79,10 @@ class Plakativ:
         else:
             raise Exception("unsupported mode: %s" % mode)
 
-        printable_width = self.layout["pagesize"][0] - (
+        printable_width = self.layout["output_pagesize"][0] - (
             self.border_left + self.border_right
         )
-        printable_height = self.layout["pagesize"][1] - (
+        printable_height = self.layout["output_pagesize"][1] - (
             self.border_top + self.border_bottom
         )
 
@@ -92,20 +91,20 @@ class Plakativ:
                 # fit the input page size into the selected postersize
                 poster_width = self.config["postersize"][0]
                 poster_height = (
-                    poster_width * self.config["pagesize"][1]
-                ) / self.config["pagesize"][0]
+                    poster_width * self.config["input_pagesize"][1]
+                ) / self.config["input_pagesize"][0]
                 if poster_height > self.config["postersize"][1]:
                     poster_height = self.config["postersize"][1]
                     poster_width = (
-                        poster_height * self.config["pagesize"][0]
-                    ) / self.config["pagesize"][1]
+                        poster_height * self.config["input_pagesize"][0]
+                    ) / self.config["input_pagesize"][1]
             elif mode == "mult":
-                area = self.config["pagesize"][0] * self.config["pagesize"][1] * mult
+                area = self.config["input_pagesize"][0] * self.config["input_pagesize"][1] * mult
                 poster_width = math.sqrt(
-                    area * self.config["pagesize"][0] / self.config["pagesize"][1]
+                    area * self.config["input_pagesize"][0] / self.config["input_pagesize"][1]
                 )
                 poster_height = math.sqrt(
-                    area * self.config["pagesize"][1] / self.config["pagesize"][0]
+                    area * self.config["input_pagesize"][1] / self.config["input_pagesize"][0]
                 )
             else:
                 raise Exception("unsupported mode: %s" % mode)
@@ -153,13 +152,13 @@ class Plakativ:
 
                     poster_width = width_portrait
                     poster_height = (
-                        poster_width * self.config["pagesize"][1]
-                    ) / self.config["pagesize"][0]
+                        poster_width * self.config["input_pagesize"][1]
+                    ) / self.config["input_pagesize"][0]
                     if poster_height > height_portrait:
                         poster_height = height_portrait
                         poster_width = (
-                            poster_height * self.config["pagesize"][0]
-                        ) / self.config["pagesize"][1]
+                            poster_height * self.config["input_pagesize"][0]
+                        ) / self.config["input_pagesize"][1]
 
                     area_portrait = poster_width * poster_height
 
@@ -172,13 +171,13 @@ class Plakativ:
 
                     poster_width = width_landscape
                     poster_height = (
-                        poster_width * self.config["pagesize"][1]
-                    ) / self.config["pagesize"][0]
+                        poster_width * self.config["input_pagesize"][1]
+                    ) / self.config["input_pagesize"][0]
                     if poster_height > height_landscape:
                         poster_height = height_landscape
                         poster_width = (
-                            poster_height * self.config["pagesize"][0]
-                        ) / self.config["pagesize"][1]
+                            poster_height * self.config["input_pagesize"][0]
+                        ) / self.config["input_pagesize"][1]
 
                     area_landscape = poster_width * poster_height
 
@@ -215,7 +214,7 @@ class Plakativ:
         # return (self.postersize, (poster_width*poster_height)/(pt_to_mm(self.dlist.rect.width)*pt_to_mm(self.dlist.rect.height)), pages_x*pages_y)
         if mode == "size":
             self.config["mult"] = (poster_width * poster_height) / (
-                self.config["pagesize"][0] * self.config["pagesize"][1]
+                self.config["input_pagesize"][0] * self.config["input_pagesize"][1]
             )
             self.config["npages"] = pages_x * pages_y
         elif mode == "mult":
@@ -224,7 +223,7 @@ class Plakativ:
         elif mode == "npages":
             self.config["postersize"] = poster_width, poster_height
             self.config["mult"] = (poster_width * poster_height) / (
-                self.config["pagesize"][0] * self.config["pagesize"][1]
+                self.config["input_pagesize"][0] * self.config["input_pagesize"][1]
             )
         else:
             raise Exception("unsupported mode: %s" % mode)
@@ -239,11 +238,11 @@ class Plakativ:
 
         for (x, y, portrait) in self.layout["positions"]:
             if portrait:
-                page_width=mm_to_pt(self.layout["pagesize"][0])
-                page_height=mm_to_pt(self.layout["pagesize"][1])
+                page_width=mm_to_pt(self.layout["output_pagesize"][0])
+                page_height=mm_to_pt(self.layout["output_pagesize"][1])
             else:
-                page_width=mm_to_pt(self.layout["pagesize"][1])
-                page_height=mm_to_pt(self.layout["pagesize"][0])
+                page_width=mm_to_pt(self.layout["output_pagesize"][1])
+                page_height=mm_to_pt(self.layout["output_pagesize"][0])
             page = outdoc.newPage(
                 -1,  # insert after last page
                 width=page_width,
@@ -259,11 +258,11 @@ class Plakativ:
             target_xoffset = 0
             target_yoffset = 0
             if portrait:
-                target_width = self.layout["pagesize"][0]
-                target_height = self.layout["pagesize"][1]
+                target_width = self.layout["output_pagesize"][0]
+                target_height = self.layout["output_pagesize"][1]
             else:
-                target_width = self.layout["pagesize"][1]
-                target_height = self.layout["pagesize"][0]
+                target_width = self.layout["output_pagesize"][1]
+                target_height = self.layout["output_pagesize"][0]
             if target_x < 0:
                 target_xoffset = -target_x
                 target_width += target_x
@@ -284,8 +283,7 @@ class Plakativ:
                 mm_to_pt(target_yoffset + target_height),
             )
 
-            # FIXME: this should probably the pagesize of the input document instead
-            factor = self.layout["pagesize"][0] / self.layout["postersize"][0]
+            factor = self.config["input_pagesize"][0] / self.layout["postersize"][0]
             sourcerect = fitz.Rect(
                 mm_to_pt(factor * target_x),
                 mm_to_pt(factor * target_y),
@@ -735,11 +733,11 @@ class Application(tkinter.Frame):
                 - zoom_1 * self.plakativ.layout["overallsize"][1] / 2
             )
             if portrait:
-                x1 = x0 + self.plakativ.layout["pagesize"][0] * zoom_1
-                y1 = y0 + self.plakativ.layout["pagesize"][1] * zoom_1
+                x1 = x0 + self.plakativ.layout["output_pagesize"][0] * zoom_1
+                y1 = y0 + self.plakativ.layout["output_pagesize"][1] * zoom_1
             else:
-                x1 = x0 + self.plakativ.layout["pagesize"][1] * zoom_1
-                y1 = y0 + self.plakativ.layout["pagesize"][0] * zoom_1
+                x1 = x0 + self.plakativ.layout["output_pagesize"][1] * zoom_1
+                y1 = y0 + self.plakativ.layout["output_pagesize"][0] * zoom_1
             self.canvas.create_rectangle(x0, y0, x1, y1, outline="red")
             self.canvas.create_rectangle(
                 x0 + zoom_1 * self.border_left.get(),
