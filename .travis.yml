@@ -17,7 +17,7 @@ matrix:
           - "$HOME/Library/Caches/Homebrew"
           - "$HOME/Library/Caches/pip"
       before_install:
-        - brew tap homebrew/dupes
+        - brew update
         - brew install tcl-tk
         - brew install python3 --with-tcl-tk
         - python3 -m pip install --upgrade virtualenv
