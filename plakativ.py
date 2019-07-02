@@ -37,47 +37,50 @@ def pt_to_mm(length):
     return (25.4 * length) / 72.0
 
 
-class Plakativ:
-    def __init__(self, infile=None):
-        self.doc = None
-        if infile is not None:
-            self.open(infile)
+class PlakativException(Exception):
+    pass
 
-    def open(self, infile):
+
+class PageNrOutOfRangeException(PlakativException):
+    pass
+
+
+class LayoutNotComputedException(PlakativException):
+    pass
+
+
+class Plakativ:
+    def __init__(self, infile, pagenr=1):
         self.doc = fitz.open(infile)
-        # only allow pdf documents with exactly a single page
-        assert len(self.doc) == 1
-        self.dlist = self.doc[0].getDisplayList()
+        self.pagenr = pagenr
 
         self.border_left = 20
         self.border_right = 20
         self.border_top = 20
         self.border_bottom = 20
-        self.config = {
-            "input_pagesize": (
-                pt_to_mm(self.dlist.rect.width),
-                pt_to_mm(self.dlist.rect.height),
-            ),
-            "postersize": PAGE_SIZES["A1 (59.4 cm × 84.1 cm)"],
-        }
-        self.layout = {"output_pagesize": PAGE_SIZES["A4 (21.0 cm × 29.7 cm)"]}
+
+    def set_input_pagenr(self, pagenr):
+        if pagenr < 1 or pagenr >= len(self.doc):
+            raise PageNrOutOfRangeException()
+
+        self.pagenr = pagenr
+
+    def get_input_page_size(self):
+        width = self.doc[self.pagenr - 1].getDisplayList().rect.width
+        height = self.doc[self.pagenr - 1].getDisplayList().rect.height
+        return (width, height)
+
+    def get_image(self, zoom):
+        mat_0 = fitz.Matrix(zoom, zoom)
+        pix = (
+            self.doc[self.pagenr - 1]
+            .getDisplayList()
+            .getPixmap(matrix=mat_0, alpha=False)
+        )
+        return pix.getImageData("ppm")
 
     def compute_layout(self, mode, size=None, mult=None, npages=None):
-        if self.doc is None:
-            return
-
-        self.config["mode"] = mode
-        self.config["postersize"] = None
-        self.config["mult"] = None
-        self.config["npages"] = None
-        if mode == "size":
-            self.config["postersize"] = size
-        elif mode == "mult":
-            self.config["mult"] = mult
-        elif mode == "npages":
-            self.config["npages"] = npages
-        else:
-            raise Exception("unsupported mode: %s" % mode)
+        self.layout = {"output_pagesize": PAGE_SIZES["A4 (21.0 cm × 29.7 cm)"]}
 
         printable_width = self.layout["output_pagesize"][0] - (
             self.border_left + self.border_right
@@ -85,27 +88,21 @@ class Plakativ:
         printable_height = self.layout["output_pagesize"][1] - (
             self.border_top + self.border_bottom
         )
+        inpage_width = pt_to_mm(self.doc[self.pagenr - 1].getDisplayList().rect.width)
+        inpage_height = pt_to_mm(self.doc[self.pagenr - 1].getDisplayList().rect.height)
 
         if mode in ["size", "mult"]:
             if mode == "size":
                 # fit the input page size into the selected postersize
-                poster_width = self.config["postersize"][0]
-                poster_height = (
-                    poster_width * self.config["input_pagesize"][1]
-                ) / self.config["input_pagesize"][0]
-                if poster_height > self.config["postersize"][1]:
-                    poster_height = self.config["postersize"][1]
-                    poster_width = (
-                        poster_height * self.config["input_pagesize"][0]
-                    ) / self.config["input_pagesize"][1]
+                poster_width = size[0]
+                poster_height = (poster_width * inpage_height) / inpage_width
+                if poster_height > size[1]:
+                    poster_height = size[1]
+                    poster_width = (poster_height * inpage_width) / inpage_height
             elif mode == "mult":
-                area = self.config["input_pagesize"][0] * self.config["input_pagesize"][1] * mult
-                poster_width = math.sqrt(
-                    area * self.config["input_pagesize"][0] / self.config["input_pagesize"][1]
-                )
-                poster_height = math.sqrt(
-                    area * self.config["input_pagesize"][1] / self.config["input_pagesize"][0]
-                )
+                area = inpage_width * inpage_height * mult
+                poster_width = math.sqrt(area * inpage_width / inpage_height)
+                poster_height = math.sqrt(area * inpage_height / inpage_width)
             else:
                 raise Exception("unsupported mode: %s" % mode)
 
@@ -143,22 +140,18 @@ class Plakativ:
             # postersize with N pages
             best_area = 0
             best = None
-            for x in range(1, self.config["npages"] + 1):
-                for y in range(1, self.config["npages"] + 1):
-                    if x * y > self.config["npages"]:
+            for x in range(1, npages + 1):
+                for y in range(1, npages + 1):
+                    if x * y > npages:
                         continue
                     width_portrait = x * printable_width
                     height_portrait = y * printable_height
 
                     poster_width = width_portrait
-                    poster_height = (
-                        poster_width * self.config["input_pagesize"][1]
-                    ) / self.config["input_pagesize"][0]
+                    poster_height = (poster_width * inpage_height) / inpage_width
                     if poster_height > height_portrait:
                         poster_height = height_portrait
-                        poster_width = (
-                            poster_height * self.config["input_pagesize"][0]
-                        ) / self.config["input_pagesize"][1]
+                        poster_width = (poster_height * inpage_width) / inpage_height
 
                     area_portrait = poster_width * poster_height
 
@@ -170,14 +163,10 @@ class Plakativ:
                     height_landscape = y * printable_width
 
                     poster_width = width_landscape
-                    poster_height = (
-                        poster_width * self.config["input_pagesize"][1]
-                    ) / self.config["input_pagesize"][0]
+                    poster_height = (poster_width * inpage_height) / inpage_width
                     if poster_height > height_landscape:
                         poster_height = height_landscape
-                        poster_width = (
-                            poster_height * self.config["input_pagesize"][0]
-                        ) / self.config["input_pagesize"][1]
+                        poster_width = (poster_height * inpage_width) / inpage_height
 
                     area_landscape = poster_width * poster_height
 
@@ -211,43 +200,38 @@ class Plakativ:
                     posy = y * printable_width
                 self.layout["positions"].append((posx, posy, portrait))
 
-        # return (self.postersize, (poster_width*poster_height)/(pt_to_mm(self.dlist.rect.width)*pt_to_mm(self.dlist.rect.height)), pages_x*pages_y)
         if mode == "size":
-            self.config["mult"] = (poster_width * poster_height) / (
-                self.config["input_pagesize"][0] * self.config["input_pagesize"][1]
-            )
-            self.config["npages"] = pages_x * pages_y
+            mult = (poster_width * poster_height) / (inpage_width * inpage_height)
+            npages = pages_x * pages_y
         elif mode == "mult":
-            self.config["postersize"] = poster_width, poster_height
-            self.config["npages"] = pages_x * pages_y
+            size = poster_width, poster_height
+            npages = pages_x * pages_y
         elif mode == "npages":
-            self.config["postersize"] = poster_width, poster_height
-            self.config["mult"] = (poster_width * poster_height) / (
-                self.config["input_pagesize"][0] * self.config["input_pagesize"][1]
-            )
+            size = poster_width, poster_height
+            mult = (poster_width * poster_height) / (inpage_width * inpage_height)
         else:
             raise Exception("unsupported mode: %s" % mode)
 
-        return self.config["postersize"], self.config["mult"], self.config["npages"]
+        return size, mult, npages
 
     def render(self, outfile):
-        outdoc = fitz.open()
+        if not hasattr(self, "layout"):
+            raise LayoutNotComputedException()
 
-        xref = 0
-        r = self.dlist.rect
+        inpage_width = pt_to_mm(self.doc[self.pagenr - 1].getDisplayList().rect.width)
+
+        outdoc = fitz.open()
 
         for (x, y, portrait) in self.layout["positions"]:
             if portrait:
-                page_width=mm_to_pt(self.layout["output_pagesize"][0])
-                page_height=mm_to_pt(self.layout["output_pagesize"][1])
+                page_width = mm_to_pt(self.layout["output_pagesize"][0])
+                page_height = mm_to_pt(self.layout["output_pagesize"][1])
             else:
-                page_width=mm_to_pt(self.layout["output_pagesize"][1])
-                page_height=mm_to_pt(self.layout["output_pagesize"][0])
+                page_width = mm_to_pt(self.layout["output_pagesize"][1])
+                page_height = mm_to_pt(self.layout["output_pagesize"][0])
             page = outdoc.newPage(
-                -1,  # insert after last page
-                width=page_width,
-                height=page_height,
-                )
+                -1, width=page_width, height=page_height  # insert after last page
+            )
 
             target_x = (
                 x - self.layout["overallsize"][0] / 2 + self.layout["postersize"][0] / 2
@@ -283,7 +267,7 @@ class Plakativ:
                 mm_to_pt(target_yoffset + target_height),
             )
 
-            factor = self.config["input_pagesize"][0] / self.layout["postersize"][0]
+            factor = inpage_width / self.layout["postersize"][0]
             sourcerect = fitz.Rect(
                 mm_to_pt(factor * target_x),
                 mm_to_pt(factor * target_y),
@@ -291,13 +275,11 @@ class Plakativ:
                 mm_to_pt(factor * (target_y + target_height)),
             )
 
-            # update xref
-            xref = page.showPDFpage(
+            page.showPDFpage(
                 targetrect,  # fill the whole page
                 self.doc,  # input document
-                0,  # input page number
+                self.pagenr - 1,  # input page number
                 clip=sourcerect,  # part of the input page to use
-                #rotate=0 if portrait else 90,
             )
 
         outdoc.save(outfile, garbage=4, deflate=True)
@@ -418,9 +400,7 @@ class Application(tkinter.Frame):
 
         self.pack(fill=tkinter.BOTH, expand=tkinter.TRUE)
 
-        if plakativ is None:
-            self.plakativ = Plakativ()
-        else:
+        if plakativ is not None:
             self.plakativ = plakativ
 
         self.border_left = tkinter.DoubleVar(value=20.0)
@@ -471,7 +451,7 @@ class Application(tkinter.Frame):
         pagesize_group.pack(fill=tkinter.X)
 
         pagesize_fixed = tkinter.StringVar()
-        if self.plakativ.doc is None:
+        if not hasattr(self, "plakativ"):
             pagesize_fixed.set("")
         else:
             pagesize_fixed.set(
@@ -484,7 +464,7 @@ class Application(tkinter.Frame):
             pagesize_fixed,
             *PAGE_SIZES.keys(),
             command=self.on_select_pagesize,
-            state=tkinter.DISABLED if self.plakativ.doc is None else tkinter.NORMAL
+            state=tkinter.DISABLED if not hasattr(self, "plakativ") else tkinter.NORMAL
         )
         pagesize_options.grid(row=1, column=0, columnspan=3, sticky=tkinter.W)
 
@@ -595,7 +575,7 @@ class Application(tkinter.Frame):
         self.postersize = PostersizeWidget(frame1.interior)
         self.postersize.pack(fill=tkinter.X)
         self.postersize.set("size", (False, (594, 841)), 1.0, 1)
-        if self.plakativ.doc is not None:
+        if hasattr(self, "plakativ"):
             self.postersize.callback = self.on_postersize
 
         layouter_group = tkinter.LabelFrame(frame1.interior, text="Layouter")
@@ -654,12 +634,7 @@ class Application(tkinter.Frame):
         mode, (custom_size, size), mult, npages = value
         size, mult, npages = self.plakativ.compute_layout(mode, size, mult, npages)
         self.draw()
-        return (
-            mode,
-            (custom_size, size),
-            mult,
-            npages,
-        )
+        return (mode, (custom_size, size), mult, npages)
 
     def on_border(self):
         self.posterizer.border_left = self.border_left.get()
@@ -682,19 +657,20 @@ class Application(tkinter.Frame):
         # clean canvas
         self.canvas.delete(tkinter.ALL)
 
-        if self.plakativ.doc is None:
+        if not hasattr(self, "plakativ"):
             return
 
         canvas_padding = 10
 
-        r = self.plakativ.dlist.rect
+        width, height = self.plakativ.get_input_page_size()
+
         zoom_0 = min(
             self.canvas_size[0]
-            / r.width
+            / width
             * self.plakativ.layout["postersize"][0]
             / (self.plakativ.layout["overallsize"][0] + canvas_padding),
             self.canvas_size[1]
-            / r.height
+            / height
             * self.plakativ.layout["postersize"][1]
             / (self.plakativ.layout["overallsize"][1] + canvas_padding),
         )
@@ -706,15 +682,13 @@ class Application(tkinter.Frame):
             / (self.plakativ.layout["overallsize"][1] + canvas_padding),
         )
 
-        mat_0 = fitz.Matrix(zoom_0, zoom_0)
-        pix = self.plakativ.dlist.getPixmap(matrix=mat_0, alpha=False)
-        img = pix.getImageData("ppm")
+        img = self.plakativ.get_image(zoom_0)
         tkimg = tkinter.PhotoImage(data=img)
 
         # draw image
         self.canvas.create_image(
-            (self.canvas_size[0] - zoom_0 * r.width) / 2,
-            (self.canvas_size[1] - zoom_0 * r.height) / 2,
+            (self.canvas_size[0] - zoom_0 * width) / 2,
+            (self.canvas_size[1] - zoom_0 * height) / 2,
             anchor=tkinter.NW,
             image=tkimg,
         )
@@ -758,18 +732,13 @@ class Application(tkinter.Frame):
         if filename == ():
             return
         self.filename = filename
-        self.plakativ.open(self.filename)
+        self.plakativ = Plakativ(self.filename)
         # compute the splitting with the current values
         mode, (_, size), mult, npages = self.postersize.value
         size, mult, npages = self.plakativ.compute_layout(mode, size, mult, npages)
         # copy computed values to postersize widget
         mode, (custom_size, _), _, _ = self.postersize.value
-        self.postersize.value = (
-            mode,
-            (custom_size, size),
-            mult,
-            npages,
-        )
+        self.postersize.value = (mode, (custom_size, size), mult, npages)
         # update postersize widget
         self.postersize.set(*self.postersize.value)
         # draw preview in canvas
@@ -1057,6 +1026,7 @@ def main():
         exit(0)
 
     compute_layout(args.input, args.output, mode="size", size=(297, 420))
+
 
 if __name__ == "__main__":
     main()
