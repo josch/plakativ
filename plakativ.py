@@ -80,12 +80,18 @@ class Plakativ:
         return pix.getImageData("ppm")
 
     def compute_layout(
-        self, mode, size=None, mult=None, npages=None, border=(0, 0, 0, 0)
+        self,
+        mode,
+        postersize=None,
+        mult=None,
+        npages=None,
+        pagesize=(210, 297),
+        border=(0, 0, 0, 0),
     ):
         border_top, border_right, border_bottom, border_left = border
 
         self.layout = {
-            "output_pagesize": PAGE_SIZES["A4 (21.0 cm × 29.7 cm)"],
+            "output_pagesize": pagesize,
             "border_top": border_top,
             "border_right": border_right,
             "border_bottom": border_bottom,
@@ -104,10 +110,10 @@ class Plakativ:
         if mode in ["size", "mult"]:
             if mode == "size":
                 # fit the input page size into the selected postersize
-                poster_width = size[0]
+                poster_width = postersize[0]
                 poster_height = (poster_width * inpage_height) / inpage_width
-                if poster_height > size[1]:
-                    poster_height = size[1]
+                if poster_height > postersize[1]:
+                    poster_height = postersize[1]
                     poster_width = (poster_height * inpage_width) / inpage_height
             elif mode == "mult":
                 area = inpage_width * inpage_height * mult
@@ -221,15 +227,15 @@ class Plakativ:
             mult = (poster_width * poster_height) / (inpage_width * inpage_height)
             npages = pages_x * pages_y
         elif mode == "mult":
-            size = poster_width, poster_height
+            postersize = poster_width, poster_height
             npages = pages_x * pages_y
         elif mode == "npages":
-            size = poster_width, poster_height
+            postersize = poster_width, poster_height
             mult = (poster_width * poster_height) / (inpage_width * inpage_height)
         else:
             raise Exception("unsupported mode: %s" % mode)
 
-        return size, mult, npages
+        return postersize, mult, npages
 
     def render(self, outfile):
         if not hasattr(self, "layout"):
@@ -453,72 +459,17 @@ class Application(tkinter.Frame):
         )
         input_range_entry.grid(row=3, column=1, sticky=tkinter.W)
 
-        pagesize_group = tkinter.LabelFrame(
-            frame1.interior, text="Size of output pages"
-        )
-        pagesize_group.pack(fill=tkinter.X)
-
-        pagesize_fixed = tkinter.StringVar()
-        if not hasattr(self, "plakativ"):
-            pagesize_fixed.set("")
-        else:
-            pagesize_fixed.set(
-                dict(zip(PAGE_SIZES.values(), PAGE_SIZES.keys()))[
-                    self.plakativ.pagesize
-                ]
-            )
-        pagesize_options = OptionMenu(
-            pagesize_group,
-            pagesize_fixed,
-            *PAGE_SIZES.keys(),
-            command=self.on_select_pagesize,
-            state=tkinter.DISABLED if not hasattr(self, "plakativ") else tkinter.NORMAL
-        )
-        pagesize_options.grid(row=1, column=0, columnspan=3, sticky=tkinter.W)
-
-        label_pagesize_width = tkinter.Label(
-            pagesize_group, text="Width:", state=tkinter.DISABLED
-        )
-        label_pagesize_width.grid(row=2, column=0, sticky=tkinter.W)
-        pagesize_width = tkinter.Spinbox(
-            pagesize_group,
-            format="%.2f",
-            increment=0.01,
-            from_=0,
-            to=100,
-            width=5,
-            state=tkinter.DISABLED,
-        )
-        pagesize_width.grid(row=2, column=1, sticky=tkinter.W)
-        label_pagesize_width_mm = tkinter.Label(
-            pagesize_group, text="mm", state=tkinter.DISABLED
-        )
-        label_pagesize_width_mm.grid(row=2, column=2, sticky=tkinter.W)
-
-        label_pagesize_height = tkinter.Label(
-            pagesize_group, text="Height:", state=tkinter.DISABLED
-        )
-        label_pagesize_height.grid(row=3, column=0, sticky=tkinter.W)
-        pagesize_height = tkinter.Spinbox(
-            pagesize_group,
-            format="%.2f",
-            increment=0.01,
-            from_=0,
-            to=100,
-            width=5,
-            state=tkinter.DISABLED,
-        )
-        pagesize_height.grid(row=3, column=1, sticky=tkinter.W)
-        label_pagesize_height_mm = tkinter.Label(
-            pagesize_group, text="mm", state=tkinter.DISABLED
-        )
-        label_pagesize_height_mm.grid(row=3, column=2, sticky=tkinter.W)
-
-        self.border = BorderWidget(frame1.interior)
-        self.border.pack(fill=tkinter.X)
-        self.border.set(20.0, 20.0, 20.0, 20.0)
+        self.pagesize = PageSizeWidget(frame1.interior)
+        self.pagesize.pack(fill=tkinter.X)
+        self.pagesize.set(False, (210, 297))
         if hasattr(self, "plakativ"):
-            self.postersize.callback = self.on_border
+            self.postersize.callback = self.on_pagesize
+
+        self.bordersize = BorderSizeWidget(frame1.interior)
+        self.bordersize.pack(fill=tkinter.X)
+        self.bordersize.set(20.0, 20.0, 20.0, 20.0)
+        if hasattr(self, "plakativ"):
+            self.postersize.callback = self.on_bordersize
 
         self.postersize = PostersizeWidget(frame1.interior)
         self.postersize.pack(fill=tkinter.X)
@@ -578,27 +529,34 @@ class Application(tkinter.Frame):
         )
         quit_button.pack(side=tkinter.RIGHT, expand=tkinter.TRUE, fill=tkinter.X)
 
-    def on_postersize(self, value):
-        mode, (custom_size, size), mult, npages = value
-        border = self.border.value
-        size, mult, npages = self.plakativ.compute_layout(
-            mode, size, mult, npages, border
-        )
-        self.draw()
-        return (mode, (custom_size, size), mult, npages)
-
-    def on_border(self, value):
+    def on_pagesize(self, value):
+        _, pagesize = value
         mode, (custom_size, size), mult, npages = self.postersize.value
+        bordersize = self.bordersize.value
         size, mult, npages = self.plakativ.compute_layout(
-            mode, size, mult, npages, value
+            mode, size, mult, npages, pagesize, bordersize
         )
         self.postersize.set(mode, (custom_size, size), mult, npages)
         self.draw()
 
-    def on_select_pagesize(self, value):
-        self.posterizer.pagesize = PAGE_SIZES[value]
-        self.posterizer.compute_layout()
+    def on_bordersize(self, value):
+        _, pagesize = self.pagesize.value
+        mode, (custom_size, size), mult, npages = self.postersize.value
+        size, mult, npages = self.plakativ.compute_layout(
+            mode, size, mult, npages, pagesize, value
+        )
+        self.postersize.set(mode, (custom_size, size), mult, npages)
         self.draw()
+
+    def on_postersize(self, value):
+        mode, (custom_size, size), mult, npages = value
+        _, pagesize = self.pagesize.value
+        border = self.bordersize.value
+        size, mult, npages = self.plakativ.compute_layout(
+            mode, size, mult, npages, pagesize, border
+        )
+        self.draw()
+        return (mode, (custom_size, size), mult, npages)
 
     def on_resize(self, event):
         self.canvas_size = (event.width, event.height)
@@ -609,6 +567,12 @@ class Application(tkinter.Frame):
         self.canvas.delete(tkinter.ALL)
 
         if not hasattr(self, "plakativ"):
+            self.canvas.create_text(
+                self.canvas_size[0] / 2,
+                self.canvas_size[1] / 2,
+                text="Click on the \"Open PDF\" button in the upper right.",
+                fill="white",
+            )
             return
 
         canvas_padding = 10
@@ -708,9 +672,10 @@ class Application(tkinter.Frame):
         self.plakativ = Plakativ(self.filename)
         # compute the splitting with the current values
         mode, (custom_size, size), mult, npages = self.postersize.value
-        border = self.border.value
+        _, pagesize = self.pagesize.value
+        border = self.bordersize.value
         size, mult, npages = self.plakativ.compute_layout(
-            mode, size, mult, npages, border
+            mode, size, mult, npages, pagesize, border
         )
         # update postersize widget
         self.postersize.set(mode, (custom_size, size), mult, npages)
@@ -719,8 +684,9 @@ class Application(tkinter.Frame):
         # enable save button
         self.save_button.configure(state=tkinter.NORMAL)
         # set callback function
+        self.pagesize.callback = self.on_pagesize
+        self.bordersize.callback = self.on_bordersize
         self.postersize.callback = self.on_postersize
-        self.border.callback = self.on_border
 
     def on_save_button(self):
         base, ext = os.path.splitext(os.path.basename(self.filename))
@@ -737,7 +703,131 @@ class Application(tkinter.Frame):
         self.plakativ.render(filename)
 
 
-class BorderWidget(tkinter.LabelFrame):
+class PageSizeWidget(tkinter.LabelFrame):
+    def __init__(self, parent, *args, **kw):
+        tkinter.LabelFrame.__init__(
+            self, parent, text="Size of output pages", *args, **kw
+        )
+
+        self.callback = None
+
+        self.variables = {
+            "dropdown": tkinter.StringVar(),
+            "width": tkinter.DoubleVar(),
+            "height": tkinter.DoubleVar(),
+        }
+
+        for k, v in self.variables.items():
+            # need to pass k and v as function arguments so that their value
+            # does not get overwritten each loop iteration
+            def callback(varname, idx, op, k_copy=k, v_copy=v):
+                assert op == "w"
+                getattr(self, "on_" + k_copy)(v_copy.get())
+
+            v.trace("w", callback)
+
+        OptionMenu(self, self.variables["dropdown"], *PAGE_SIZES.keys()).grid(
+            row=1, column=0, columnspan=3, sticky=tkinter.W
+        )
+
+        tkinter.Label(
+            self, text="Width:", state=tkinter.DISABLED, name="size_label_width"
+        ).grid(row=2, column=0, sticky=tkinter.W)
+        tkinter.Spinbox(
+            self,
+            format="%.2f",
+            increment=0.01,
+            from_=0,
+            to=100,
+            width=5,
+            state=tkinter.DISABLED,
+            name="spinbox_width",
+            textvariable=self.variables["width"],
+        ).grid(row=2, column=1, sticky=tkinter.W)
+        tkinter.Label(
+            self, text="mm", state=tkinter.DISABLED, name="size_label_width_mm"
+        ).grid(row=2, column=2, sticky=tkinter.W)
+
+        tkinter.Label(
+            self, text="Height:", state=tkinter.DISABLED, name="size_label_height"
+        ).grid(row=3, column=0, sticky=tkinter.W)
+        tkinter.Spinbox(
+            self,
+            format="%.2f",
+            increment=0.01,
+            from_=0,
+            to=100,
+            width=5,
+            state=tkinter.DISABLED,
+            name="spinbox_height",
+            textvariable=self.variables["height"],
+        ).grid(row=3, column=1, sticky=tkinter.W)
+        tkinter.Label(
+            self, text="mm", state=tkinter.DISABLED, name="size_label_height_mm"
+        ).grid(row=3, column=2, sticky=tkinter.W)
+
+    def on_dropdown(self, value):
+        custom_size, size = self.value
+        if value == "custom":
+            custom_size = True
+        else:
+            custom_size = False
+            size = PAGE_SIZES[value]
+        self.set(custom_size, size)
+
+    def on_width(self, value):
+        if getattr(self, "value", None) is None:
+            return
+        custom_size, (_, height) = self.value
+        self.set(custom_size, (value, height))
+
+    def on_height(self, value):
+        if getattr(self, "value", None) is None:
+            return
+        custom_size, (width, _) = self.value
+        self.set(custom_size, (width, value))
+
+    def set(self, custom_size, pagesize):
+        # before setting self.value, check if the effective value is different
+        # from before or otherwise we do not need to execute the callback in
+        # the end
+        state_changed = True
+        if getattr(self, "value", None) is not None:
+            state_changed = self.value != (custom_size, pagesize)
+        # execute callback if necessary
+        if state_changed and self.callback is not None:
+            self.callback((custom_size, pagesize))
+        self.value = (custom_size, pagesize)
+        width, height = pagesize
+        if custom_size:
+            self.nametowidget("size_label_width").configure(state=tkinter.NORMAL)
+            self.nametowidget("spinbox_width").configure(state=tkinter.NORMAL)
+            self.nametowidget("size_label_width_mm").configure(state=tkinter.NORMAL)
+            self.nametowidget("size_label_height").configure(state=tkinter.NORMAL)
+            self.nametowidget("spinbox_height").configure(state=tkinter.NORMAL)
+            self.nametowidget("size_label_height_mm").configure(state=tkinter.NORMAL)
+        else:
+            self.nametowidget("size_label_width").configure(state=tkinter.DISABLED)
+            self.nametowidget("spinbox_width").configure(state=tkinter.DISABLED)
+            self.nametowidget("size_label_width_mm").configure(state=tkinter.DISABLED)
+            self.nametowidget("size_label_height").configure(state=tkinter.DISABLED)
+            self.nametowidget("spinbox_height").configure(state=tkinter.DISABLED)
+            self.nametowidget("size_label_height_mm").configure(state=tkinter.DISABLED)
+        # only set variables that changed to not trigger multiple variable tracers
+        if custom_size:
+            if self.variables["dropdown"].get() != "custom":
+                self.variables["dropdown"].set("custom")
+        else:
+            val = dict(zip(PAGE_SIZES.values(), PAGE_SIZES.keys()))[(width, height)]
+            if self.variables["dropdown"].get() != val:
+                self.variables["dropdown"].set(val)
+        if self.variables["width"].get() != width:
+            self.variables["width"].set(width)
+        if self.variables["height"].get() != height:
+            self.variables["height"].set(height)
+
+
+class BorderSizeWidget(tkinter.LabelFrame):
     def __init__(self, parent, *args, **kw):
         tkinter.LabelFrame.__init__(
             self, parent, text="Output Borders/Overlap", *args, **kw
@@ -859,7 +949,7 @@ class PostersizeWidget(tkinter.LabelFrame):
             self.variables["dropdown"],
             *PAGE_SIZES.keys(),
             #            state=tkinter.DISABLED,
-            name="size_dropdown"
+            name="size_dropdown",
         ).grid(row=1, column=0, columnspan=3, sticky=tkinter.W, padx=(27, 0))
 
         tkinter.Label(
@@ -1042,10 +1132,17 @@ class PostersizeWidget(tkinter.LabelFrame):
 
 
 def compute_layout(
-    infile, outfile, mode, size=None, mult=None, npages=None, border=(0, 0, 0, 0)
+    infile,
+    outfile,
+    mode,
+    size=None,
+    mult=None,
+    npages=None,
+    pagesize=(210, 297),
+    border=(0, 0, 0, 0),
 ):
     plakativ = Plakativ(infile)
-    plakativ.compute_layout(mode, size, mult, npages, border)
+    plakativ.compute_layout(mode, size, mult, npages, pagesize, border)
     plakativ.render(outfile)
 
 
