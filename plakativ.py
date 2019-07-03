@@ -79,14 +79,24 @@ class Plakativ:
         )
         return pix.getImageData("ppm")
 
-    def compute_layout(self, mode, size=None, mult=None, npages=None):
-        self.layout = {"output_pagesize": PAGE_SIZES["A4 (21.0 cm × 29.7 cm)"]}
+    def compute_layout(
+        self, mode, size=None, mult=None, npages=None, border=(0, 0, 0, 0)
+    ):
+        border_top, border_right, border_bottom, border_left = border
+
+        self.layout = {
+            "output_pagesize": PAGE_SIZES["A4 (21.0 cm × 29.7 cm)"],
+            "border_top": border_top,
+            "border_right": border_right,
+            "border_bottom": border_bottom,
+            "border_left": border_left,
+        }
 
         printable_width = self.layout["output_pagesize"][0] - (
-            self.border_left + self.border_right
+            border_left + border_right
         )
         printable_height = self.layout["output_pagesize"][1] - (
-            self.border_top + self.border_bottom
+            border_top + border_bottom
         )
         inpage_width = pt_to_mm(self.doc[self.pagenr - 1].getDisplayList().rect.width)
         inpage_height = pt_to_mm(self.doc[self.pagenr - 1].getDisplayList().rect.height)
@@ -106,8 +116,6 @@ class Plakativ:
             else:
                 raise Exception("unsupported mode: %s" % mode)
 
-            self.layout["postersize"] = poster_width, poster_height
-
             pages_x_portrait = math.ceil(poster_width / printable_width)
             pages_y_portrait = math.ceil(poster_height / printable_height)
 
@@ -124,17 +132,9 @@ class Plakativ:
             if portrait:
                 pages_x = pages_x_portrait
                 pages_y = pages_y_portrait
-                self.layout["overallsize"] = (
-                    pages_x * printable_width + (self.border_right + self.border_left),
-                    pages_y * printable_height + (self.border_top + self.border_bottom),
-                )
             else:
                 pages_x = pages_x_landscape
                 pages_y = pages_y_landscape
-                self.layout["overallsize"] = (
-                    pages_x * printable_height + (self.border_top + self.border_bottom),
-                    pages_y * printable_width + (self.border_right + self.border_left),
-                )
         elif mode == "npages":
             # stupid bruteforce algorithm to determine the largest printable
             # postersize with N pages
@@ -175,20 +175,37 @@ class Plakativ:
                         best = (x, y, False, poster_width, poster_height)
 
             pages_x, pages_y, portrait, poster_width, poster_height = best
-            self.layout["postersize"] = poster_width, poster_height
-            if portrait:
-                self.layout["overallsize"] = (
-                    pages_x * printable_width + (self.border_right + self.border_left),
-                    pages_y * printable_height + (self.border_top + self.border_bottom),
-                )
-            else:
-                self.layout["overallsize"] = (
-                    pages_x * printable_height + (self.border_top + self.border_bottom),
-                    pages_y * printable_width + (self.border_right + self.border_left),
-                )
         else:
             raise Exception("unsupported mode: %s" % mode)
 
+        # size of the bounding box of all pages after they have been glued together
+        if portrait:
+            self.layout["overallsize"] = (
+                pages_x * printable_width + (border_right + border_left),
+                pages_y * printable_height + (border_top + border_bottom),
+            )
+        else:
+            self.layout["overallsize"] = (
+                pages_x * printable_height + (border_top + border_bottom),
+                pages_y * printable_width + (border_right + border_left),
+            )
+
+        # size of output poster is always proportional to size of input page
+        self.layout["postersize"] = poster_width, poster_height
+
+        # position of the poster relative to upper left corner of layout["overallsize"]
+        if portrait:
+            self.layout["posterpos"] = (
+                border_left + (pages_x * printable_width - poster_width) / 2,
+                border_top + (pages_y * printable_height - poster_height) / 2,
+            )
+        else:
+            self.layout["posterpos"] = (
+                border_bottom + (pages_x * printable_height - poster_width) / 2,
+                border_right + (pages_y * printable_width - poster_height) / 2,
+            )
+
+        # positions are relative to upper left corner of poster
         self.layout["positions"] = []
         for y in range(pages_y):
             for x in range(pages_x):
@@ -233,12 +250,8 @@ class Plakativ:
                 -1, width=page_width, height=page_height  # insert after last page
             )
 
-            target_x = (
-                x - self.layout["overallsize"][0] / 2 + self.layout["postersize"][0] / 2
-            )
-            target_y = (
-                y - self.layout["overallsize"][1] / 2 + self.layout["postersize"][1] / 2
-            )
+            target_x = x - self.layout["posterpos"][0]
+            target_y = y - self.layout["posterpos"][1]
             target_xoffset = 0
             target_yoffset = 0
             if portrait:
@@ -403,11 +416,6 @@ class Application(tkinter.Frame):
         if plakativ is not None:
             self.plakativ = plakativ
 
-        self.border_left = tkinter.DoubleVar(value=20.0)
-        self.border_right = tkinter.DoubleVar(value=20.0)
-        self.border_top = tkinter.DoubleVar(value=20.0)
-        self.border_bottom = tkinter.DoubleVar(value=20.0)
-
         self.canvas = tkinter.Canvas(self, bg="black")
         self.canvas.pack(fill=tkinter.BOTH, side=tkinter.LEFT, expand=tkinter.TRUE)
         self.canvas_size = self.canvas.winfo_width(), self.canvas.winfo_height()
@@ -506,71 +514,11 @@ class Application(tkinter.Frame):
         )
         label_pagesize_height_mm.grid(row=3, column=2, sticky=tkinter.W)
 
-        border_group = tkinter.LabelFrame(
-            frame1.interior, text="Output Borders/Overlap"
-        )
-        border_group.pack(fill=tkinter.X)
-
-        label_left = tkinter.Label(border_group, text="Left:")
-        label_left.grid(row=0, column=0, sticky=tkinter.W)
-        border_left = tkinter.Spinbox(
-            border_group,
-            format="%.2f",
-            increment=0.01,
-            from_=0,
-            to=100,
-            width=5,
-            textvariable=self.border_left,
-            command=self.on_border,
-        )
-        border_left.grid(row=0, column=1)
-        label_left_mm = tkinter.Label(border_group, text="mm")
-        label_left_mm.grid(row=0, column=2)
-        label_right = tkinter.Label(border_group, text="Right:")
-        label_right.grid(row=1, column=0, sticky=tkinter.W)
-        border_right = tkinter.Spinbox(
-            border_group,
-            format="%.2f",
-            increment=0.01,
-            from_=0,
-            to=100,
-            width=5,
-            textvariable=self.border_right,
-            command=self.on_border,
-        )
-        border_right.grid(row=1, column=1)
-        label_right_mm = tkinter.Label(border_group, text="mm")
-        label_right_mm.grid(row=1, column=2)
-        label_top = tkinter.Label(border_group, text="Top:")
-        label_top.grid(row=2, column=0, sticky=tkinter.W)
-        border_top = tkinter.Spinbox(
-            border_group,
-            format="%.2f",
-            increment=0.01,
-            from_=0,
-            to=100,
-            width=5,
-            textvariable=self.border_top,
-            command=self.on_border,
-        )
-        border_top.grid(row=2, column=1)
-        label_top_mm = tkinter.Label(border_group, text="mm")
-        label_top_mm.grid(row=2, column=2)
-        label_bottom = tkinter.Label(border_group, text="Bottom:")
-        label_bottom.grid(row=3, column=0, sticky=tkinter.W)
-        border_bottom = tkinter.Spinbox(
-            border_group,
-            format="%.2f",
-            increment=0.01,
-            from_=0,
-            to=100,
-            width=5,
-            textvariable=self.border_bottom,
-            command=self.on_border,
-        )
-        border_bottom.grid(row=3, column=1)
-        label_bottom_mm = tkinter.Label(border_group, text="mm")
-        label_bottom_mm.grid(row=3, column=2)
+        self.border = BorderWidget(frame1.interior)
+        self.border.pack(fill=tkinter.X)
+        self.border.set(20.0, 20.0, 20.0, 20.0)
+        if hasattr(self, "plakativ"):
+            self.postersize.callback = self.on_border
 
         self.postersize = PostersizeWidget(frame1.interior)
         self.postersize.pack(fill=tkinter.X)
@@ -632,16 +580,19 @@ class Application(tkinter.Frame):
 
     def on_postersize(self, value):
         mode, (custom_size, size), mult, npages = value
-        size, mult, npages = self.plakativ.compute_layout(mode, size, mult, npages)
+        border = self.border.value
+        size, mult, npages = self.plakativ.compute_layout(
+            mode, size, mult, npages, border
+        )
         self.draw()
         return (mode, (custom_size, size), mult, npages)
 
-    def on_border(self):
-        self.posterizer.border_left = self.border_left.get()
-        self.posterizer.border_right = self.border_right.get()
-        self.posterizer.border_top = self.border_top.get()
-        self.posterizer.border_bottom = self.border_bottom.get()
-        self.posterizer.compute_layout()
+    def on_border(self, value):
+        mode, (custom_size, size), mult, npages = self.postersize.value
+        size, mult, npages = self.plakativ.compute_layout(
+            mode, size, mult, npages, value
+        )
+        self.postersize.set(mode, (custom_size, size), mult, npages)
         self.draw()
 
     def on_select_pagesize(self, value):
@@ -664,6 +615,8 @@ class Application(tkinter.Frame):
 
         width, height = self.plakativ.get_input_page_size()
 
+        # factor to convert from input page dimensions (given in pt) into
+        # canvas dimensions (given in pixels)
         zoom_0 = min(
             self.canvas_size[0]
             / width
@@ -675,6 +628,11 @@ class Application(tkinter.Frame):
             / (self.plakativ.layout["overallsize"][1] + canvas_padding),
         )
 
+        img = self.plakativ.get_image(zoom_0)
+        tkimg = tkinter.PhotoImage(data=img)
+
+        # factor to convert from output poster dimensions (given in mm) into
+        # canvas dimensions (given in pixels)
         zoom_1 = min(
             self.canvas_size[0]
             / (self.plakativ.layout["overallsize"][0] + canvas_padding),
@@ -682,13 +640,12 @@ class Application(tkinter.Frame):
             / (self.plakativ.layout["overallsize"][1] + canvas_padding),
         )
 
-        img = self.plakativ.get_image(zoom_0)
-        tkimg = tkinter.PhotoImage(data=img)
-
-        # draw image
+        # draw image on canvas
         self.canvas.create_image(
-            (self.canvas_size[0] - zoom_0 * width) / 2,
-            (self.canvas_size[1] - zoom_0 * height) / 2,
+            (self.canvas_size[0] - zoom_1 * self.plakativ.layout["overallsize"][0]) / 2
+            + zoom_1 * self.plakativ.layout["posterpos"][0],
+            (self.canvas_size[1] - zoom_1 * self.plakativ.layout["overallsize"][1]) / 2
+            + zoom_1 * self.plakativ.layout["posterpos"][1],
             anchor=tkinter.NW,
             image=tkimg,
         )
@@ -698,13 +655,19 @@ class Application(tkinter.Frame):
         for (x, y, portrait) in self.plakativ.layout["positions"]:
             x0 = (
                 x * zoom_1
-                + self.canvas_size[0] / 2
-                - zoom_1 * self.plakativ.layout["overallsize"][0] / 2
+                + (
+                    self.canvas_size[0]
+                    - zoom_1 * self.plakativ.layout["overallsize"][0]
+                )
+                / 2
             )
             y0 = (
                 y * zoom_1
-                + self.canvas_size[1] / 2
-                - zoom_1 * self.plakativ.layout["overallsize"][1] / 2
+                + (
+                    self.canvas_size[1]
+                    - zoom_1 * self.plakativ.layout["overallsize"][1]
+                )
+                / 2
             )
             if portrait:
                 x1 = x0 + self.plakativ.layout["output_pagesize"][0] * zoom_1
@@ -713,11 +676,21 @@ class Application(tkinter.Frame):
                 x1 = x0 + self.plakativ.layout["output_pagesize"][1] * zoom_1
                 y1 = y0 + self.plakativ.layout["output_pagesize"][0] * zoom_1
             self.canvas.create_rectangle(x0, y0, x1, y1, outline="red")
+            if portrait:
+                top = self.plakativ.layout["border_top"]
+                right = self.plakativ.layout["border_right"]
+                bottom = self.plakativ.layout["border_bottom"]
+                left = self.plakativ.layout["border_left"]
+            else:
+                top = self.plakativ.layout["border_left"]
+                right = self.plakativ.layout["border_top"]
+                bottom = self.plakativ.layout["border_right"]
+                left = self.plakativ.layout["border_bottom"]
             self.canvas.create_rectangle(
-                x0 + zoom_1 * self.border_left.get(),
-                y0 + zoom_1 * self.border_top.get(),
-                x1 - zoom_1 * self.border_right.get(),
-                y1 - zoom_1 * self.border_bottom.get(),
+                x0 + zoom_1 * left,
+                y0 + zoom_1 * top,
+                x1 - zoom_1 * right,
+                y1 - zoom_1 * bottom,
                 outline="blue",
             )
 
@@ -734,19 +707,20 @@ class Application(tkinter.Frame):
         self.filename = filename
         self.plakativ = Plakativ(self.filename)
         # compute the splitting with the current values
-        mode, (_, size), mult, npages = self.postersize.value
-        size, mult, npages = self.plakativ.compute_layout(mode, size, mult, npages)
-        # copy computed values to postersize widget
-        mode, (custom_size, _), _, _ = self.postersize.value
-        self.postersize.value = (mode, (custom_size, size), mult, npages)
+        mode, (custom_size, size), mult, npages = self.postersize.value
+        border = self.border.value
+        size, mult, npages = self.plakativ.compute_layout(
+            mode, size, mult, npages, border
+        )
         # update postersize widget
-        self.postersize.set(*self.postersize.value)
+        self.postersize.set(mode, (custom_size, size), mult, npages)
         # draw preview in canvas
         self.draw()
         # enable save button
         self.save_button.configure(state=tkinter.NORMAL)
         # set callback function
         self.postersize.callback = self.on_postersize
+        self.border.callback = self.on_border
 
     def on_save_button(self):
         base, ext = os.path.splitext(os.path.basename(self.filename))
@@ -761,6 +735,90 @@ class Application(tkinter.Frame):
         if filename == "":
             return
         self.plakativ.render(filename)
+
+
+class BorderWidget(tkinter.LabelFrame):
+    def __init__(self, parent, *args, **kw):
+        tkinter.LabelFrame.__init__(
+            self, parent, text="Output Borders/Overlap", *args, **kw
+        )
+
+        self.callback = None
+
+        self.variables = dict()
+        for i, (n, label) in enumerate(
+            [
+                ("top", "Top:"),
+                ("right", "Right:"),
+                ("bottom", "Bottom:"),
+                ("left", "Left:"),
+            ]
+        ):
+            self.variables[n] = tkinter.DoubleVar()
+            # need to pass k and v as function arguments so that their value
+            # does not get overwritten each loop iteration
+            def callback(varname, idx, op, k_copy=n, v_copy=self.variables[n]):
+                assert op == "w"
+                getattr(self, "on_" + k_copy)(v_copy.get())
+
+            self.variables[n].trace("w", callback)
+
+            tkinter.Label(self, text=label).grid(row=i, column=0, sticky=tkinter.W)
+            tkinter.Spinbox(
+                self,
+                format="%.2f",
+                increment=1.0,
+                from_=0,
+                to=100,
+                width=5,
+                textvariable=self.variables[n],
+            ).grid(row=i, column=1)
+            tkinter.Label(self, text="mm").grid(row=i, column=2)
+
+    def on_top(self, value):
+        if getattr(self, "value", None) is None:
+            return
+        _, right, bottom, left = self.value
+        self.set(value, right, bottom, left)
+
+    def on_right(self, value):
+        if getattr(self, "value", None) is None:
+            return
+        top, _, bottom, left = self.value
+        self.set(top, value, bottom, left)
+
+    def on_bottom(self, value):
+        if getattr(self, "value", None) is None:
+            return
+        top, right, _, left = self.value
+        self.set(top, right, value, left)
+
+    def on_left(self, value):
+        if getattr(self, "value", None) is None:
+            return
+        top, right, bottom, _ = self.value
+        self.set(top, right, bottom, value)
+
+    def set(self, top, right, bottom, left):
+        # before setting self.value, check if the effective value is different
+        # from before or otherwise we do not need to execute the callback in
+        # the end
+        state_changed = True
+        if getattr(self, "value", None) is not None:
+            state_changed = self.value != (top, right, bottom, left)
+        # execute callback if necessary
+        if state_changed and self.callback is not None:
+            self.callback((top, right, bottom, left))
+        self.value = top, right, bottom, left
+        # only set variables that changed to not trigger multiple variable tracers
+        if self.variables["top"].get() != top:
+            self.variables["top"].set(top)
+        if self.variables["right"].get() != right:
+            self.variables["right"].set(right)
+        if self.variables["bottom"].get() != bottom:
+            self.variables["bottom"].set(bottom)
+        if self.variables["left"].get() != left:
+            self.variables["left"].set(left)
 
 
 class PostersizeWidget(tkinter.LabelFrame):
@@ -983,9 +1041,11 @@ class PostersizeWidget(tkinter.LabelFrame):
             self.variables["pages"].set(npages)
 
 
-def compute_layout(infile, outfile, mode, size=None, mult=None, npages=None):
+def compute_layout(
+    infile, outfile, mode, size=None, mult=None, npages=None, border=(0, 0, 0, 0)
+):
     plakativ = Plakativ(infile)
-    plakativ.compute_layout(mode, size, mult, npages)
+    plakativ.compute_layout(mode, size, mult, npages, border)
     plakativ.render(outfile)
 
 
@@ -1015,8 +1075,10 @@ def main():
     else:
         parser.set_defaults(gui=False)
 
+    parser.add_argument(
+        "--mode", choices=["size", "mult", "npages"], help="select poster size"
+    )
     parser.add_argument("-o", "--output", help="output file")
-
     parser.add_argument("input", nargs="?", help="input file")
 
     args = parser.parse_args()
@@ -1025,7 +1087,7 @@ def main():
         gui()
         exit(0)
 
-    compute_layout(args.input, args.output, mode="size", size=(297, 420))
+    compute_layout(args.input, args.output, mode=args.mode, size=(297, 420))
 
 
 if __name__ == "__main__":

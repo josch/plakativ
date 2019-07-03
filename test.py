@@ -140,7 +140,7 @@ def test_cases(postersize, input_pagesize, output_pagesize, expected):
 
     fd, outfile = tempfile.mkstemp(prefix="plakativ")
     os.close(fd)
-    plakativ.compute_layout(infile, outfile, mode="size", size=postersize)
+    plakativ.compute_layout(infile, outfile, mode="size", size=postersize, border=(20, 20, 20, 20))
     os.unlink(infile)
 
     reader = pdfrw.PdfReader(outfile)
