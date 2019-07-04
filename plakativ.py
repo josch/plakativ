@@ -1305,7 +1305,7 @@ def main():
 
     if args.gui:
         gui()
-        exit(0)
+        sys.exit(0)
 
     compute_layout(args.input, args.output, mode=args.mode, size=(297, 420))
 
