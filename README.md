@@ -1,5 +1,4 @@
 [![Travis Status](https://travis-ci.org/josch/plakativ.svg?branch=master)](https://travis-ci.org/josch/plakativ)
-
 [![Appveyor Status](https://ci.appveyor.com/api/projects/status/32r7s2skrgm9ubva/branch/master?svg=true)](https://ci.appveyor.com/project/josch/plakativ/branch/master)
 
 plakativ
@@ -15,14 +14,15 @@ larger poster.
 Demo
 ====
 
+Plakativ works on Windows, Linux and MacOS
+
 ![](demo.gif)
 
-[//]: # To make a new Video, run:
-[//]: #
-[//]: # ffmpeg -f x11grab -framerate 30 -video_size 800x600 -i :0.0+41,46 -preset ultrafast -c:v libx264 -crf 0 out.mp4
-[//]: # ffmpeg -i out.mp4 -ss 00:00:04.000 -r 2.5 plakativ%04d.png
-[//]: # convert -loop 0 plakativ*.png +map -layers Optimize plakativ.gif
-[//]: # gifsicle -b -O3 plakativ.gif
+[//]: # (To make a new Video, run:)
+[//]: # (ffmpeg -f x11grab -framerate 30 -video_size 800x600 -i :0.0+41,46 -preset ultrafast -c:v libx264 -crf 0 out.mp4)
+[//]: # (ffmpeg -i out.mp4 -ss 00:00:04.000 -r 2.5 plakativ%04d.png)
+[//]: # (convert -loop 0 plakativ*.png +map -layers Optimize plakativ.gif)
+[//]: # (gifsicle -b -O3 plakativ.gif)
 
 Features
 ========
