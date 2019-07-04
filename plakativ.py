@@ -1,5 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+#
+# Plakativ allows to create posters bigger than the page size one's own printer
+# is able to print on by enlarging the input PDF, cutting it into smaller
+# pieces and putting each of them onto a paper size that can be printed
+# normally. The result can then be glued together into a bigger poster.
+#
+# Copyright (C) 2019 Johannes 'josch' Schauer
+#
+# This program is free software: you can redistribute it and/or modify it under
+# the terms of the GNU General Public License version 3 as published by the
+# Free Software Foundation.
 
 from collections import OrderedDict
 import math
