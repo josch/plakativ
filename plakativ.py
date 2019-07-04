@@ -50,7 +50,7 @@ class LayoutNotComputedException(PlakativException):
 
 
 class Plakativ:
-    def __init__(self, infile, pagenr=1):
+    def __init__(self, infile, pagenr=0):
         self.doc = fitz.open(infile)
         self.pagenr = pagenr
 
@@ -59,23 +59,27 @@ class Plakativ:
         self.border_top = 20
         self.border_bottom = 20
 
+    # set page number -- first page is 0
     def set_input_pagenr(self, pagenr):
-        if pagenr < 1 or pagenr >= len(self.doc):
-            raise PageNrOutOfRangeException()
+        if pagenr < 0 or pagenr >= len(self.doc):
+            raise PageNrOutOfRangeException(
+                "%d is not between 0 and %d (inclusive)" % (pagenr, len(self.doc))
+            )
 
         self.pagenr = pagenr
 
+    def get_input_pagenums(self):
+        return len(self.doc)
+
     def get_input_page_size(self):
-        width = self.doc[self.pagenr - 1].getDisplayList().rect.width
-        height = self.doc[self.pagenr - 1].getDisplayList().rect.height
+        width = self.doc[self.pagenr].getDisplayList().rect.width
+        height = self.doc[self.pagenr].getDisplayList().rect.height
         return (width, height)
 
     def get_image(self, zoom):
         mat_0 = fitz.Matrix(zoom, zoom)
         pix = (
-            self.doc[self.pagenr - 1]
-            .getDisplayList()
-            .getPixmap(matrix=mat_0, alpha=False)
+            self.doc[self.pagenr].getDisplayList().getPixmap(matrix=mat_0, alpha=False)
         )
         return pix.getImageData("ppm")
 
@@ -104,8 +108,8 @@ class Plakativ:
         printable_height = self.layout["output_pagesize"][1] - (
             border_top + border_bottom
         )
-        inpage_width = pt_to_mm(self.doc[self.pagenr - 1].getDisplayList().rect.width)
-        inpage_height = pt_to_mm(self.doc[self.pagenr - 1].getDisplayList().rect.height)
+        inpage_width = pt_to_mm(self.doc[self.pagenr].getDisplayList().rect.width)
+        inpage_height = pt_to_mm(self.doc[self.pagenr].getDisplayList().rect.height)
 
         if mode in ["size", "mult"]:
             if mode == "size":
@@ -241,7 +245,7 @@ class Plakativ:
         if not hasattr(self, "layout"):
             raise LayoutNotComputedException()
 
-        inpage_width = pt_to_mm(self.doc[self.pagenr - 1].getDisplayList().rect.width)
+        inpage_width = pt_to_mm(self.doc[self.pagenr].getDisplayList().rect.width)
 
         outdoc = fitz.open()
 
@@ -297,7 +301,7 @@ class Plakativ:
             page.showPDFpage(
                 targetrect,  # fill the whole page
                 self.doc,  # input document
-                self.pagenr - 1,  # input page number
+                self.pagenr,  # input page number
                 clip=sourcerect,  # part of the input page to use
             )
 
@@ -363,6 +367,7 @@ class VerticalScrolledFrame(tkinter.Frame):
 # Python License
 #
 # add support for 'state' and 'name' kwargs
+# add support for updating list of options
 class OptionMenu(tkinter.Menubutton):
     """OptionMenu which allows the user to select a value from a menu."""
 
@@ -387,23 +392,27 @@ class OptionMenu(tkinter.Menubutton):
             del kwargs["name"]
         tkinter.Widget.__init__(self, master, "menubutton", kw)
         self.widgetName = "tk_optionMenu"
-        menu = self.__menu = tkinter.Menu(self, name="menu", tearoff=0)
-        self.menuname = menu._w
-        # 'command' is the only supported keyword
-        callback = kwargs.get("command")
+        self.callback = kwargs.get("command")
+        self.variable = variable
         if "command" in kwargs:
             del kwargs["command"]
         if kwargs:
             raise tkinter.TclError("unknown option -" + list(kwargs.keys())[0])
-        menu.add_command(label=value, command=tkinter._setit(variable, value, callback))
-        for v in values:
-            menu.add_command(label=v, command=tkinter._setit(variable, v, callback))
-        self["menu"] = menu
+        self.set_values([value] + list(values))
 
     def __getitem__(self, name):
         if name == "menu":
             return self.__menu
         return tkinter.Widget.__getitem__(self, name)
+
+    def set_values(self, values):
+        menu = self.__menu = tkinter.Menu(self, name="menu", tearoff=0)
+        self.menuname = menu._w
+        for v in values:
+            menu.add_command(
+                label=v, command=tkinter._setit(self.variable, v, self.callback)
+            )
+        self["menu"] = menu
 
     def destroy(self):
         """Destroy this widget and the associated menu."""
@@ -427,11 +436,10 @@ class Application(tkinter.Frame):
         self.canvas_size = self.canvas.winfo_width(), self.canvas.winfo_height()
         self.canvas.bind("<Configure>", self.on_resize)
 
-        # tkinter does not allow scrollbars for frames
-        frame1 = VerticalScrolledFrame(self)
-        frame1.pack(side=tkinter.TOP, expand=tkinter.TRUE, fill=tkinter.Y)
+        frame_right = tkinter.Frame(self)
+        frame_right.pack(side=tkinter.TOP, expand=tkinter.TRUE, fill=tkinter.Y)
 
-        top_frame = tkinter.Frame(frame1.interior)
+        top_frame = tkinter.Frame(frame_right)
         top_frame.pack(fill=tkinter.X)
 
         open_button = tkinter.Button(
@@ -441,23 +449,14 @@ class Application(tkinter.Frame):
         help_button = tkinter.Button(top_frame, text="Help", state=tkinter.DISABLED)
         help_button.pack(side=tkinter.RIGHT, expand=tkinter.TRUE, fill=tkinter.X)
 
-        input_group = tkinter.LabelFrame(frame1.interior, text="Input properties")
-        input_group.pack(fill=tkinter.X)
+        frame1 = VerticalScrolledFrame(frame_right)
+        frame1.pack(side=tkinter.TOP, expand=tkinter.TRUE, fill=tkinter.Y)
 
-        label_input_width = tkinter.Label(input_group, text="Width:")
-        label_input_width.grid(row=0, column=0, sticky=tkinter.W)
-        label_input_height = tkinter.Label(input_group, text="Height:")
-        label_input_height.grid(row=1, column=0, sticky=tkinter.W)
-        label_input_npages = tkinter.Label(input_group, text="# of pages:")
-        label_input_npages.grid(row=2, column=0, sticky=tkinter.W)
-        label_input_range = tkinter.Label(input_group, text="Page range:")
-        label_input_range.grid(row=3, column=0, sticky=tkinter.W)
-        self.input_range = tkinter.StringVar()
-        self.input_range.set("1")
-        input_range_entry = tkinter.Entry(
-            input_group, textvariable=self.input_range, width=6, state=tkinter.DISABLED
-        )
-        input_range_entry.grid(row=3, column=1, sticky=tkinter.W)
+        self.input = InputWidget(frame1.interior)
+        self.input.pack(fill=tkinter.X)
+        self.input.set(1, (0, 0))
+        if hasattr(self, "plakativ"):
+            self.input.callback = self.on_input
 
         self.pagesize = PageSizeWidget(frame1.interior)
         self.pagesize.pack(fill=tkinter.X)
@@ -513,7 +512,28 @@ class Application(tkinter.Frame):
             output_group, text="Print poster border", state=tkinter.DISABLED
         ).pack(anchor=tkinter.W)
 
-        bottom_frame = tkinter.Frame(frame1.interior)
+        option_group = tkinter.LabelFrame(frame1.interior, text="Program options")
+        option_group.pack(fill=tkinter.X)
+
+        tkinter.Label(option_group, text="Unit:", state=tkinter.DISABLED).grid(
+            row=0, column=0, sticky=tkinter.W
+        )
+        unit = tkinter.StringVar()
+        unit.set("mm")
+        OptionMenu(option_group, unit, ["mm"], state=tkinter.DISABLED).grid(
+            row=0, column=1, sticky=tkinter.W
+        )
+
+        tkinter.Label(option_group, text="Language:", state=tkinter.DISABLED).grid(
+            row=1, column=0, sticky=tkinter.W
+        )
+        language = tkinter.StringVar()
+        language.set("English")
+        OptionMenu(option_group, language, ["English"], state=tkinter.DISABLED).grid(
+            row=1, column=1, sticky=tkinter.W
+        )
+
+        bottom_frame = tkinter.Frame(frame_right)
         bottom_frame.pack(fill=tkinter.X)
 
         self.save_button = tkinter.Button(
@@ -529,10 +549,26 @@ class Application(tkinter.Frame):
         )
         quit_button.pack(side=tkinter.RIGHT, expand=tkinter.TRUE, fill=tkinter.X)
 
-    def on_pagesize(self, value):
-        _, pagesize = value
+    def on_input(self, value):
+        _, pagesize = self.pagesize.value
+        pagenum, _ = value
         mode, (custom_size, size), mult, npages = self.postersize.value
         bordersize = self.bordersize.value
+        self.plakativ.set_input_pagenr(pagenum - 1)
+        size, mult, npages = self.plakativ.compute_layout(
+            mode, size, mult, npages, pagesize, bordersize
+        )
+        self.postersize.set(mode, (custom_size, size), mult, npages)
+        self.draw()
+        width, height = self.plakativ.get_input_page_size()
+        return "%.02f" % pt_to_mm(width), "%.02f" % pt_to_mm(height)
+
+    def on_pagesize(self, value):
+        _, pagesize = value
+        pagenum, _ = self.input.value
+        mode, (custom_size, size), mult, npages = self.postersize.value
+        bordersize = self.bordersize.value
+        self.plakativ.set_input_pagenr(pagenum - 1)
         size, mult, npages = self.plakativ.compute_layout(
             mode, size, mult, npages, pagesize, bordersize
         )
@@ -541,7 +577,9 @@ class Application(tkinter.Frame):
 
     def on_bordersize(self, value):
         _, pagesize = self.pagesize.value
+        pagenum, _ = self.input.value
         mode, (custom_size, size), mult, npages = self.postersize.value
+        self.plakativ.set_input_pagenr(pagenum - 1)
         size, mult, npages = self.plakativ.compute_layout(
             mode, size, mult, npages, pagesize, value
         )
@@ -550,8 +588,10 @@ class Application(tkinter.Frame):
 
     def on_postersize(self, value):
         mode, (custom_size, size), mult, npages = value
+        pagenum, _ = self.input.value
         _, pagesize = self.pagesize.value
         border = self.bordersize.value
+        self.plakativ.set_input_pagenr(pagenum - 1)
         size, mult, npages = self.plakativ.compute_layout(
             mode, size, mult, npages, pagesize, border
         )
@@ -570,7 +610,7 @@ class Application(tkinter.Frame):
             self.canvas.create_text(
                 self.canvas_size[0] / 2,
                 self.canvas_size[1] / 2,
-                text="Click on the \"Open PDF\" button in the upper right.",
+                text='Click on the "Open PDF" button in the upper right.',
                 fill="white",
             )
             return
@@ -677,6 +717,15 @@ class Application(tkinter.Frame):
         size, mult, npages = self.plakativ.compute_layout(
             mode, size, mult, npages, pagesize, border
         )
+        # update input widget
+        width, height = self.plakativ.get_input_page_size()
+        self.input.set(1, ("%.02f" % pt_to_mm(width), "%.02f" % pt_to_mm(height)))
+        self.input.nametowidget("spinbox_pagenum").configure(
+            to=self.plakativ.get_input_pagenums()
+        )
+        self.input.nametowidget("label_of_pagenum").configure(
+            text="of %d" % self.plakativ.get_input_pagenums()
+        )
         # update postersize widget
         self.postersize.set(mode, (custom_size, size), mult, npages)
         # draw preview in canvas
@@ -684,6 +733,7 @@ class Application(tkinter.Frame):
         # enable save button
         self.save_button.configure(state=tkinter.NORMAL)
         # set callback function
+        self.input.callback = self.on_input
         self.pagesize.callback = self.on_pagesize
         self.bordersize.callback = self.on_bordersize
         self.postersize.callback = self.on_postersize
@@ -701,6 +751,78 @@ class Application(tkinter.Frame):
         if filename == "":
             return
         self.plakativ.render(filename)
+
+
+class InputWidget(tkinter.LabelFrame):
+    def __init__(self, parent, *args, **kw):
+        tkinter.LabelFrame.__init__(self, parent, text="Input properties", *args, **kw)
+
+        self.callback = None
+
+        self.variables = {
+            "pagenum": tkinter.IntVar(),
+            "width": tkinter.StringVar(),
+            "height": tkinter.StringVar(),
+        }
+
+        def callback(varname, idx, op):
+            assert op == "w"
+            self.on_pagenum(self.variables["pagenum"].get())
+
+        self.variables["pagenum"].trace("w", callback)
+
+        tkinter.Label(self, text="Use page").grid(row=0, column=0, sticky=tkinter.W)
+        tkinter.Spinbox(
+            self,
+            increment=1,
+            from_=1,
+            to=100,
+            width=3,
+            name="spinbox_pagenum",
+            textvariable=self.variables["pagenum"],
+        ).grid(row=0, column=1, sticky=tkinter.W)
+        tkinter.Label(self, text="of 1", name="label_of_pagenum").grid(
+            row=0, column=2, sticky=tkinter.W
+        )
+        tkinter.Label(self, text="Width:").grid(row=1, column=0, sticky=tkinter.W)
+        tkinter.Label(self, textvariable=self.variables["width"]).grid(
+            row=1, column=1, sticky=tkinter.W
+        )
+        tkinter.Label(self, text="mm", name="size_label_width_mm").grid(
+            row=1, column=2, sticky=tkinter.W
+        )
+        tkinter.Label(self, text="Height:").grid(row=2, column=0, sticky=tkinter.W)
+        tkinter.Label(self, textvariable=self.variables["height"]).grid(
+            row=2, column=1, sticky=tkinter.W
+        )
+        tkinter.Label(self, text="mm", name="size_label_height_mm").grid(
+            row=2, column=2, sticky=tkinter.W
+        )
+
+    def on_pagenum(self, value):
+        if getattr(self, "value", None) is None:
+            return
+        _, size = self.value
+        self.set(value, size)
+
+    def set(self, pagenum, pagesize):
+        # before setting self.value, check if the effective value is different
+        # from before or otherwise we do not need to execute the callback in
+        # the end
+        state_changed = True
+        if getattr(self, "value", None) is not None:
+            state_changed = self.value != (pagenum, pagesize)
+        # execute callback if necessary
+        if state_changed and self.callback is not None:
+            pagesize = self.callback((pagenum, pagesize))
+        self.value = (pagenum, pagesize)
+        width, height = pagesize
+        if self.variables["pagenum"].get() != pagenum:
+            self.variables["pagenum"].set(pagenum)
+        if self.variables["width"].get() != width:
+            self.variables["width"].set(width)
+        if self.variables["height"].get() != height:
+            self.variables["height"].set(height)
 
 
 class PageSizeWidget(tkinter.LabelFrame):
@@ -1138,10 +1260,11 @@ def compute_layout(
     size=None,
     mult=None,
     npages=None,
+    pagenr=0,
     pagesize=(210, 297),
     border=(0, 0, 0, 0),
 ):
-    plakativ = Plakativ(infile)
+    plakativ = Plakativ(infile, pagenr)
     plakativ.compute_layout(mode, size, mult, npages, pagesize, border)
     plakativ.render(outfile)
 
