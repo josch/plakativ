@@ -27,12 +27,12 @@ VERSION = "0.1"
 PAGE_SIZES = OrderedDict(
     [
         ("custom", (None, None)),
-        ("A0 (84.1 cm × 118.9 cm)", (841, 1189)),
-        ("A1 (59.4 cm × 84.1 cm)", (594, 841)),
-        ("A2 (42.0 cm × 59.4 cm)", (420, 594)),
-        ("A3 (29.7 cm × 42.0 cm)", (297, 420)),
-        ("A4 (21.0 cm × 29.7 cm)", (210, 297)),
-        ("A5 (14.8 cm × 21.0 cm)", (148, 210)),
+        ("A0 (841 mm × 1189 mm)", (841, 1189)),
+        ("A1 (594 mm × 841 mm)", (594, 841)),
+        ("A2 (420 mm × 594 mm)", (420, 594)),
+        ("A3 (297 mm × 420 mm)", (297, 420)),
+        ("A4 (210 mm × 297 mm)", (210, 297)),
+        ("A5 (148 mm × 210 mm)", (148, 210)),
         ("Letter (8.5 in × 11 in)", (215.9, 279.4)),
         ("Legal (8.5 in × 14 in)", (215.9, 355.6)),
         ("Tabloid (11 in × 17 in)", (279.4, 431.8)),
@@ -58,6 +58,189 @@ class PageNrOutOfRangeException(PlakativException):
 
 class LayoutNotComputedException(PlakativException):
     pass
+
+
+def simple_cover(n, m, x, y):
+    pages_x_portrait = math.ceil(n / x)
+    pages_y_portrait = math.ceil(m / y)
+    pages_x_landscape = math.ceil(n / y)
+    pages_y_landscape = math.ceil(m / x)
+    if pages_x_portrait * pages_y_portrait <= pages_x_landscape * pages_y_landscape:
+        pages_x = pages_x_portrait
+        pages_y = pages_y_portrait
+        portrait = True
+        size = pages_x * x, pages_y * y
+    else:
+        pages_x = pages_x_landscape
+        pages_y = pages_y_landscape
+        portrait = False
+        size = pages_x * y, pages_y * x
+    config = list()
+    for py in range(pages_y):
+        for px in range(pages_x):
+            if portrait:
+                posx = px * x
+                posy = py * y
+            else:
+                posx = px * y
+                posy = py * x
+            config.append((posx, posy, portrait))
+    return config, size
+
+
+# the function complex_cover() is based on a heuristic proposed by
+# stackoverflow user m69 https://stackoverflow.com/users/4907604/m69 as a reply
+# to this question https://stackoverflow.com/questions/39306507
+#
+# In addition to computing the number of required rectangles it also returns
+# the position of the rectangles.
+#
+# In contrast to the solution by m69 this algorithm mandates at least one page
+# in each corner of the result. This means that the minimum solution size is
+# four. The advantage is, that the layout computed by this algorithm will
+# always be completely be inside the poster without leaving the poster area.
+# This in turn will make assembling the poster easier.
+#
+# This heuristic is not optimal. We always use a regular simple cover for the
+# hole in the center (if it exists) but there are situations where the hole in
+# the center should be covered by a complex cover instead. We do not consider
+# this improvement because:
+#   - it's required very seldom
+#   - it makes the resulting layout more complicated to glue together
+#   - there is no proof that the improved version is optimal either
+#   - we save some cpu cycles
+def complex_cover(n, m, x, y):
+    # each tuple-entry represents one of the corners of the poster
+    # upper-left, upper-right, lower-right, lower-left
+    portrait = (
+        (True, True, True, False),
+        (True, True, False, False),
+        (True, False, True, False),
+        (True, False, False, True),
+        (True, False, False, False),
+    )
+    X = lambda r, d: x if portrait[r][d] else y
+    Y = lambda r, d: y if portrait[r][d] else x
+    if x == y:
+        # if page sizes are square, only one rotation has to be checked
+        num_rotations = 1
+    elif n == m:
+        # if the poster size is a square, rotation 4 and 5 (which are itself
+        # just rotations of rotations 2 and 1, respectively) do not need to be
+        # checked
+        num_rotations = 3
+    else:
+        num_rotations = 5
+    minimum = math.ceil((n * m) / (x * y))
+    config, _ = simple_cover(n, m, x, y)
+    cover = len(config)
+    if cover == minimum:
+        return config
+
+    for r in range(num_rotations):
+        # w0 -> width of upper left corner pages
+        for w0 in range(1, math.ceil(n / X(r, 0))):
+            # w1 -> width of upper right corner pages
+            w1 = math.ceil((n - w0 * X(r, 0)) / X(r, 1))
+            if w1 < 0:
+                w1 = 0
+            # h0 -> height of upper left corner pages
+            for h0 in range(1, math.ceil(m / Y(r, 0))):
+                # h3 -> height of lower left corner pages
+                h3 = math.ceil((m - h0 * Y(r, 0)) / Y(r, 3))
+                if h3 < 0:
+                    h3 = 0
+                # w2 -> width of lower right corner pages
+                for w2 in range(1, math.ceil(n / X(r, 2))):
+                    # w3 -> width of lower left corner pages
+                    w3 = math.ceil((n - w2 * X(r, 2)) / X(r, 3))
+                    if w3 < 0:
+                        w3 = 0
+                    # h2 -> height of lower right corner pages
+                    for h2 in range(1, math.ceil(m / Y(r, 2))):
+                        # h1 -> height of upper right corner pages
+                        h1 = math.ceil((m - h2 * Y(r, 2)) / Y(r, 1))
+                        if h1 < 0:
+                            h1 = 0
+                        newconfig = list()
+                        # upper-left (w0,h0)
+                        for i in range(w0):
+                            for j in range(h0):
+                                newconfig.append(
+                                    (i * X(r, 0), j * Y(r, 0), portrait[r][0])
+                                )
+                        # upper-right (w1,h1)
+                        for i in range(w1):
+                            for j in range(h1):
+                                newconfig.append(
+                                    (
+                                        n - w1 * X(r, 1) + i * X(r, 1),
+                                        j * Y(r, 1),
+                                        portrait[r][1],
+                                    )
+                                )
+                        # lower-right (w2,h2)
+                        for i in range(w2):
+                            for j in range(h2):
+                                newconfig.append(
+                                    (
+                                        n - w2 * X(r, 2) + i * X(r, 2),
+                                        m - h2 * Y(r, 2) + j * Y(r, 2),
+                                        portrait[r][2],
+                                    )
+                                )
+                        # lower-left (w3,h3)
+                        for i in range(w3):
+                            for j in range(h3):
+                                newconfig.append(
+                                    (
+                                        i * X(r, 3),
+                                        m - h3 * Y(r, 3) + j * Y(r, 3),
+                                        portrait[r][3],
+                                    )
+                                )
+
+                        # if neither rectangle 0 overlaps with rectangle 2 nor
+                        # does rectangle 1 overlap with rectangle 3 in the center,
+                        # then a center cover has to be added
+                        X4 = n - w0 * X(r, 0) - w2 * X(r, 2)
+                        Y4 = m - h1 * Y(r, 1) - h3 * Y(r, 3)
+                        simple_config = []
+                        if X4 > 0 and Y4 > 0:
+                            simple_config, (sx, sy) = simple_cover(X4, Y4, x, y)
+                            # shift the results such that they are in the center
+                            for (cx, cy, p) in simple_config:
+                                newconfig.append(
+                                    (
+                                        w0 * X(r, 0) + (X4 - sx) / 2 + cx,
+                                        h1 * Y(r, 1) + (Y4 - sy) / 2 + cy,
+                                        p,
+                                    )
+                                )
+                        else:
+                            X4 = n - w1 * X(r, 1) - w3 * X(r, 3)
+                            Y4 = m - h0 * Y(r, 0) - h2 * Y(r, 2)
+                            if X4 > 0 and Y4 > 0:
+                                simple_config, (sx, sy) = simple_cover(X4, Y4, x, y)
+                                # shift the results such that they are in the center
+                                for (cx, cy, p) in simple_config:
+                                    newconfig.append(
+                                        (
+                                            w3 * X(r, 3) + (X4 - sx) / 2 + cx,
+                                            h0 * Y(r, 0) + (Y4 - sy) / 2 + cy,
+                                            p,
+                                        )
+                                    )
+                        total = len(newconfig)
+                        # shortcut to cut computation short in case a
+                        # solution with the minimal possible number of
+                        # pages is found
+                        if total == minimum:
+                            return newconfig
+                        if total < cover:
+                            cover = total
+                            config = newconfig
+    return config
 
 
 class Plakativ:
@@ -102,6 +285,7 @@ class Plakativ:
         npages=None,
         pagesize=(210, 297),
         border=(0, 0, 0, 0),
+        strategy="simple",
     ):
         border_top, border_right, border_bottom, border_left = border
 
@@ -136,26 +320,6 @@ class Plakativ:
                 poster_height = math.sqrt(area * inpage_height / inpage_width)
             else:
                 raise Exception("unsupported mode: %s" % mode)
-
-            pages_x_portrait = math.ceil(poster_width / printable_width)
-            pages_y_portrait = math.ceil(poster_height / printable_height)
-
-            pages_x_landscape = math.ceil(poster_width / printable_height)
-            pages_y_landscape = math.ceil(poster_height / printable_width)
-
-            portrait = True
-            if (
-                pages_x_portrait * pages_y_portrait
-                > pages_x_landscape * pages_y_landscape
-            ):
-                portrait = False
-
-            if portrait:
-                pages_x = pages_x_portrait
-                pages_y = pages_y_portrait
-            else:
-                pages_x = pages_x_landscape
-                pages_y = pages_y_landscape
         elif mode == "npages":
             # stupid bruteforce algorithm to determine the largest printable
             # postersize with N pages
@@ -178,7 +342,7 @@ class Plakativ:
 
                     if area_portrait > best_area:
                         best_area = area_portrait
-                        best = (x, y, True, poster_width, poster_height)
+                        best = (poster_width, poster_height)
 
                     width_landscape = x * printable_height
                     height_landscape = y * printable_width
@@ -193,11 +357,82 @@ class Plakativ:
 
                     if area_landscape > best_area:
                         best_area = area_landscape
-                        best = (x, y, False, poster_width, poster_height)
+                        best = (poster_width, poster_height)
 
-            pages_x, pages_y, portrait, poster_width, poster_height = best
+            poster_width, poster_height = best
+
+            if strategy == "complex":
+                # bisect poster sizes until we find the largest size that can
+                # be printed given the available number of pages
+
+                # we already know the maximum size for a solution utilizing the
+                # simple cover algorithm, so this will be the minimum known
+                # poster size
+                min_area_mult = (poster_width * poster_height) / (
+                    inpage_width * inpage_height
+                )
+                # to avoid floating point errors later
+                min_area_mult *= 0.9999
+                min_area_npages = len(
+                    complex_cover(
+                        poster_width, poster_height, printable_width, printable_height
+                    )
+                )
+
+                # the maximum possible size is a poster of the area created by
+                # multiplying the individual page areas by the maximum number
+                # of pages available
+                max_area_mult = (npages * printable_width * printable_height) / (
+                    inpage_width * inpage_height
+                )
+                max_area_npages = len(
+                    complex_cover(
+                        math.sqrt(max_area_mult) * inpage_width,
+                        math.sqrt(max_area_mult) * inpage_height,
+                        printable_width,
+                        printable_height,
+                    )
+                )
+
+                while True:
+                    if abs(min_area_mult - max_area_mult) < 0.001:
+                        break
+                    new_area_mult = (min_area_mult + max_area_mult) / 2
+                    new_area_npages = len(
+                        complex_cover(
+                            math.sqrt(new_area_mult) * inpage_width,
+                            math.sqrt(new_area_mult) * inpage_height,
+                            printable_width,
+                            printable_height,
+                        )
+                    )
+                    if new_area_npages > npages:
+                        max_area_mult = new_area_mult
+                    else:
+                        min_area_mult = new_area_mult
+
+                poster_width = inpage_width * math.sqrt(min_area_mult)
+                poster_height = inpage_height * math.sqrt(min_area_mult)
+
         else:
             raise Exception("unsupported mode: %s" % mode)
+
+        pages_x_portrait = math.ceil(poster_width / printable_width)
+        pages_y_portrait = math.ceil(poster_height / printable_height)
+
+        pages_x_landscape = math.ceil(poster_width / printable_height)
+        pages_y_landscape = math.ceil(poster_height / printable_width)
+
+        portrait = True
+        if pages_x_portrait * pages_y_portrait > pages_x_landscape * pages_y_landscape:
+            portrait = False
+
+        if portrait:
+            pages_x = pages_x_portrait
+            pages_y = pages_y_portrait
+        else:
+            pages_x = pages_x_landscape
+            pages_y = pages_y_landscape
 
         # size of the bounding box of all pages after they have been glued together
         if portrait:
@@ -211,9 +446,6 @@ class Plakativ:
                 pages_y * printable_width + (border_right + border_left),
             )
 
-        # size of output poster is always proportional to size of input page
-        self.layout["postersize"] = poster_width, poster_height
-
         # position of the poster relative to upper left corner of layout["overallsize"]
         if portrait:
             self.layout["posterpos"] = (
@@ -226,24 +458,84 @@ class Plakativ:
                 border_right + (pages_y * printable_width - poster_height) / 2,
             )
 
-        # positions are relative to upper left corner of poster
+        # positions are relative to self.layout["posterpos"]
         self.layout["positions"] = []
         for y in range(pages_y):
             for x in range(pages_x):
                 if portrait:
-                    posx = x * printable_width
-                    posy = y * printable_height
+                    posx = (
+                        x * printable_width
+                        - (pages_x * printable_width - poster_width) / 2
+                    )
+                    posy = (
+                        y * printable_height
+                        - (pages_y * printable_height - poster_height) / 2
+                    )
                 else:
-                    posx = x * printable_height
-                    posy = y * printable_width
+                    posx = (
+                        x * printable_height
+                        - (pages_x * printable_height - poster_width) / 2
+                    )
+                    posy = (
+                        y * printable_width
+                        - (pages_y * printable_width - poster_height) / 2
+                    )
                 self.layout["positions"].append((posx, posy, portrait))
+
+        if strategy == "complex":
+            positions_complex = complex_cover(
+                poster_width, poster_height, printable_width, printable_height
+            )
+
+            if len(positions_complex) < len(self.layout["positions"]):
+                self.layout["positions"] = positions_complex
+                # figure out the borders around the final poster by analyzing
+                # the computed positions and storing the largest border size in
+                # each dimension
+                poster_top = poster_right = poster_bottom = poster_left = 0
+                for (posx, posy, p) in self.layout["positions"]:
+                    if p:
+                        top = posy - border_top
+                        if top < 0 and -top > poster_top:
+                            poster_top = -top
+                        right = posx + printable_width + border_right - poster_width
+                        if right > 0 and right > poster_right:
+                            poster_right = right
+                        bottom = posy + printable_height + border_bottom - poster_height
+                        if bottom > 0 and bottom > poster_bottom:
+                            poster_bottom = bottom
+                        left = posx - border_left
+                        if left < 0 and -left > poster_left:
+                            poster_left = -left
+                    else:
+                        top = posy - border_left
+                        if top < 0 and -top > poster_top:
+                            poster_top = -top
+                        right = posx + printable_height + border_top - poster_width
+                        if right > 0 and right > poster_right:
+                            poster_right = right
+                        bottom = posy + printable_width + border_right - poster_height
+                        if bottom > 0 and bottom > poster_bottom:
+                            poster_bottom = bottom
+                        left = posx - border_bottom
+                        if left < 0 and -left > poster_left:
+                            poster_left = -left
+                self.layout["overallsize"] = (
+                    poster_width + poster_left + poster_right,
+                    poster_height + poster_top + poster_bottom,
+                )
+
+                self.layout["posterpos"] = (poster_left, poster_top)
+
+        # size of output poster is always proportional to size of input page
+        self.layout["postersize"] = poster_width, poster_height
 
         if mode == "size":
             mult = (poster_width * poster_height) / (inpage_width * inpage_height)
-            npages = pages_x * pages_y
+            npages = len(self.layout["positions"])
         elif mode == "mult":
             postersize = poster_width, poster_height
-            npages = pages_x * pages_y
+            npages = len(self.layout["positions"])
         elif mode == "npages":
             postersize = poster_width, poster_height
             mult = (poster_width * poster_height) / (inpage_width * inpage_height)
@@ -271,16 +563,18 @@ class Plakativ:
                 -1, width=page_width, height=page_height  # insert after last page
             )
 
-            target_x = x - self.layout["posterpos"][0]
-            target_y = y - self.layout["posterpos"][1]
-            target_xoffset = 0
-            target_yoffset = 0
             if portrait:
+                target_x = x - self.layout["border_left"]
+                target_y = y - self.layout["border_top"]
                 target_width = self.layout["output_pagesize"][0]
                 target_height = self.layout["output_pagesize"][1]
             else:
+                target_x = x - self.layout["border_bottom"]
+                target_y = y - self.layout["border_left"]
                 target_width = self.layout["output_pagesize"][1]
                 target_height = self.layout["output_pagesize"][0]
+            target_xoffset = 0
+            target_yoffset = 0
             if target_x < 0:
                 target_xoffset = -target_x
                 target_width += target_x
@@ -487,31 +781,11 @@ class Application(tkinter.Frame):
         if hasattr(self, "plakativ"):
             self.postersize.callback = self.on_postersize
 
-        layouter_group = tkinter.LabelFrame(frame1.interior, text="Layouter")
-        layouter_group.pack(fill=tkinter.X)
-
-        self.layouter = tkinter.IntVar()
-        self.layouter.set(1)
-        layouter1 = tkinter.Radiobutton(
-            layouter_group, text="Simple", variable=self.layouter, value=1
-        )
-        layouter1.pack(anchor=tkinter.W)
-        layouter2 = tkinter.Radiobutton(
-            layouter_group,
-            text="Advanced",
-            variable=self.layouter,
-            value=2,
-            state=tkinter.DISABLED,
-        )
-        layouter2.pack(anchor=tkinter.W)
-        layouter3 = tkinter.Radiobutton(
-            layouter_group,
-            text="Complex",
-            variable=self.layouter,
-            value=3,
-            state=tkinter.DISABLED,
-        )
-        layouter3.pack(anchor=tkinter.W)
+        self.layouter = LayouterWidget(frame1.interior)
+        self.layouter.pack(fill=tkinter.X)
+        self.layouter.set("simple")
+        if hasattr(self, "plakativ"):
+            self.postersize.callback = self.on_layouter
 
         output_group = tkinter.LabelFrame(frame1.interior, text="Output options")
         output_group.pack(fill=tkinter.X)
@@ -521,6 +795,12 @@ class Application(tkinter.Frame):
         ).pack(anchor=tkinter.W)
         tkinter.Checkbutton(
             output_group, text="Print poster border", state=tkinter.DISABLED
+        ).pack(anchor=tkinter.W)
+        tkinter.Checkbutton(
+            output_group, text="Print page number", state=tkinter.DISABLED
+        ).pack(anchor=tkinter.W)
+        tkinter.Checkbutton(
+            output_group, text="Print layout cover page", state=tkinter.DISABLED
         ).pack(anchor=tkinter.W)
 
         option_group = tkinter.LabelFrame(frame1.interior, text="Program options")
@@ -565,9 +845,10 @@ class Application(tkinter.Frame):
         pagenum, _ = value
         mode, (custom_size, size), mult, npages = self.postersize.value
         bordersize = self.bordersize.value
+        strategy = self.layouter.value
         self.plakativ.set_input_pagenr(pagenum - 1)
         size, mult, npages = self.plakativ.compute_layout(
-            mode, size, mult, npages, pagesize, bordersize
+            mode, size, mult, npages, pagesize, bordersize, strategy
         )
         self.postersize.set(mode, (custom_size, size), mult, npages)
         self.draw()
@@ -579,9 +860,10 @@ class Application(tkinter.Frame):
         pagenum, _ = self.input.value
         mode, (custom_size, size), mult, npages = self.postersize.value
         bordersize = self.bordersize.value
+        strategy = self.layouter.value
         self.plakativ.set_input_pagenr(pagenum - 1)
         size, mult, npages = self.plakativ.compute_layout(
-            mode, size, mult, npages, pagesize, bordersize
+            mode, size, mult, npages, pagesize, bordersize, strategy
         )
         self.postersize.set(mode, (custom_size, size), mult, npages)
         self.draw()
@@ -590,9 +872,10 @@ class Application(tkinter.Frame):
         _, pagesize = self.pagesize.value
         pagenum, _ = self.input.value
         mode, (custom_size, size), mult, npages = self.postersize.value
+        strategy = self.layouter.value
         self.plakativ.set_input_pagenr(pagenum - 1)
         size, mult, npages = self.plakativ.compute_layout(
-            mode, size, mult, npages, pagesize, value
+            mode, size, mult, npages, pagesize, value, strategy
         )
         self.postersize.set(mode, (custom_size, size), mult, npages)
         self.draw()
@@ -602,12 +885,25 @@ class Application(tkinter.Frame):
         pagenum, _ = self.input.value
         _, pagesize = self.pagesize.value
         border = self.bordersize.value
+        strategy = self.layouter.value
         self.plakativ.set_input_pagenr(pagenum - 1)
         size, mult, npages = self.plakativ.compute_layout(
-            mode, size, mult, npages, pagesize, border
+            mode, size, mult, npages, pagesize, border, strategy
         )
         self.draw()
         return (mode, (custom_size, size), mult, npages)
+
+    def on_layouter(self, value):
+        _, pagesize = self.pagesize.value
+        pagenum, _ = self.input.value
+        mode, (custom_size, size), mult, npages = self.postersize.value
+        border = self.bordersize.value
+        self.plakativ.set_input_pagenr(pagenum - 1)
+        size, mult, npages = self.plakativ.compute_layout(
+            mode, size, mult, npages, pagesize, border, value
+        )
+        self.postersize.set(mode, (custom_size, size), mult, npages)
+        self.draw()
 
     def on_resize(self, event):
         self.canvas_size = (event.width, event.height)
@@ -666,48 +962,59 @@ class Application(tkinter.Frame):
         )
         self.canvas.image = tkimg
 
+        # self.canvas.create_text(
+        #    self.canvas_size[0] / 2,
+        #    self.canvas_size[1] / 2,
+        #    text="%d" % len(self.plakativ.layout["positions"]),
+        #    fill="grey",
+        #    font=("TkDefaultFont", 40),
+        #    anchor=tkinter.CENTER,
+        # )
+
         # draw rectangles
+        # TODO: also draw numbers indicating the page number
         for (x, y, portrait) in self.plakativ.layout["positions"]:
-            x0 = (
-                x * zoom_1
-                + (
-                    self.canvas_size[0]
-                    - zoom_1 * self.plakativ.layout["overallsize"][0]
-                )
-                / 2
-            )
-            y0 = (
-                y * zoom_1
-                + (
-                    self.canvas_size[1]
-                    - zoom_1 * self.plakativ.layout["overallsize"][1]
-                )
-                / 2
-            )
+            x0 = (x + self.plakativ.layout["posterpos"][0]) * zoom_1 + (
+                self.canvas_size[0] - zoom_1 * self.plakativ.layout["overallsize"][0]
+            ) / 2
+            y0 = (y + self.plakativ.layout["posterpos"][1]) * zoom_1 + (
+                self.canvas_size[1] - zoom_1 * self.plakativ.layout["overallsize"][1]
+            ) / 2
             if portrait:
-                x1 = x0 + self.plakativ.layout["output_pagesize"][0] * zoom_1
-                y1 = y0 + self.plakativ.layout["output_pagesize"][1] * zoom_1
+                page_width = self.plakativ.layout["output_pagesize"][0] * zoom_1
+                page_height = self.plakativ.layout["output_pagesize"][1] * zoom_1
+                top = self.plakativ.layout["border_top"] * zoom_1
+                right = self.plakativ.layout["border_right"] * zoom_1
+                bottom = self.plakativ.layout["border_bottom"] * zoom_1
+                left = self.plakativ.layout["border_left"] * zoom_1
             else:
-                x1 = x0 + self.plakativ.layout["output_pagesize"][1] * zoom_1
-                y1 = y0 + self.plakativ.layout["output_pagesize"][0] * zoom_1
-            self.canvas.create_rectangle(x0, y0, x1, y1, outline="red")
-            if portrait:
-                top = self.plakativ.layout["border_top"]
-                right = self.plakativ.layout["border_right"]
-                bottom = self.plakativ.layout["border_bottom"]
-                left = self.plakativ.layout["border_left"]
-            else:
-                top = self.plakativ.layout["border_left"]
-                right = self.plakativ.layout["border_top"]
-                bottom = self.plakativ.layout["border_right"]
-                left = self.plakativ.layout["border_bottom"]
+                # page is rotated 90 degrees clockwise
+                page_width = self.plakativ.layout["output_pagesize"][1] * zoom_1
+                page_height = self.plakativ.layout["output_pagesize"][0] * zoom_1
+                top = self.plakativ.layout["border_left"] * zoom_1
+                right = self.plakativ.layout["border_top"] * zoom_1
+                bottom = self.plakativ.layout["border_right"] * zoom_1
+                left = self.plakativ.layout["border_bottom"] * zoom_1
+            # inner rectangle
             self.canvas.create_rectangle(
-                x0 + zoom_1 * left,
-                y0 + zoom_1 * top,
-                x1 - zoom_1 * right,
-                y1 - zoom_1 * bottom,
+                x0,
+                y0,
+                x0 + page_width - left - right,
+                y0 + page_height - top - bottom,
                 outline="blue",
             )
+            # outer rectangle
+            self.canvas.create_rectangle(
+                x0 - left,
+                y0 - top,
+                x0 - left + page_width,
+                y0 - top + page_height,
+                outline="red",
+            )
+
+        # filename = "out_%03d.ps" % len(self.plakativ.layout["positions"])
+        # self.canvas.postscript(file=filename)
+        # print("saved ", filename)
 
     def on_open_button(self):
         filename = tkinter.filedialog.askopenfilename(
@@ -725,8 +1032,9 @@ class Application(tkinter.Frame):
         mode, (custom_size, size), mult, npages = self.postersize.value
         _, pagesize = self.pagesize.value
         border = self.bordersize.value
+        strategy = self.layouter.value
         size, mult, npages = self.plakativ.compute_layout(
-            mode, size, mult, npages, pagesize, border
+            mode, size, mult, npages, pagesize, border, strategy
         )
         # update input widget
         width, height = self.plakativ.get_input_page_size()
@@ -748,6 +1056,7 @@ class Application(tkinter.Frame):
         self.pagesize.callback = self.on_pagesize
         self.bordersize.callback = self.on_bordersize
         self.postersize.callback = self.on_postersize
+        self.layouter.callback = self.on_layouter
 
     def on_save_button(self):
         base, ext = os.path.splitext(os.path.basename(self.filename))
@@ -762,6 +1071,50 @@ class Application(tkinter.Frame):
         if filename == "":
             return
         self.plakativ.render(filename)
+
+
+class LayouterWidget(tkinter.LabelFrame):
+    def __init__(self, parent, *args, **kw):
+        tkinter.LabelFrame.__init__(self, parent, text="Layouter", *args, **kw)
+
+        self.callback = None
+
+        self.variables = {"strategy": tkinter.StringVar()}
+
+        def callback(varname, idx, op):
+            assert op == "w"
+            self.on_strategy(self.variables["strategy"].get())
+
+        self.variables["strategy"].trace("w", callback)
+
+        layouter1 = tkinter.Radiobutton(
+            self, text="Simple", variable=self.variables["strategy"], value="simple"
+        )
+        layouter1.pack(anchor=tkinter.W)
+        layouter3 = tkinter.Radiobutton(
+            self, text="Complex", variable=self.variables["strategy"], value="complex"
+        )
+        layouter3.pack(anchor=tkinter.W)
+
+    def on_strategy(self, value):
+        if getattr(self, "value", None) is None:
+            return
+        strategy = self.value
+        self.set(value)
+
+    def set(self, strategy):
+        # before setting self.value, check if the effective value is different
+        # from before or otherwise we do not need to execute the callback in
+        # the end
+        state_changed = True
+        if getattr(self, "value", None) is not None:
+            state_changed = self.value != strategy
+        # execute callback if necessary
+        if state_changed and self.callback is not None:
+            pagesize = self.callback(strategy)
+        self.value = strategy
+        if self.variables["strategy"].get() != strategy:
+            self.variables["strategy"].set(strategy)
 
 
 class InputWidget(tkinter.LabelFrame):
@@ -1123,7 +1476,7 @@ class PostersizeWidget(tkinter.LabelFrame):
 
         tkinter.Radiobutton(
             self,
-            text="Factor of input page size",
+            text="Factor of input page area",
             variable=self.variables["radio"],
             value="mult",
             state=tkinter.DISABLED,
@@ -1274,9 +1627,10 @@ def compute_layout(
     pagenr=0,
     pagesize=(210, 297),
     border=(0, 0, 0, 0),
+    strategy="simple",
 ):
     plakativ = Plakativ(infile, pagenr)
-    plakativ.compute_layout(mode, size, mult, npages, pagesize, border)
+    plakativ.compute_layout(mode, size, mult, npages, pagesize, border, strategy)
     plakativ.render(outfile)
 
 
@@ -1324,4 +1678,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-__all__ = ["Plakativ", "compute_layout"]
+__all__ = ["Plakativ", "compute_layout", "simple_cover", "complex_cover"]

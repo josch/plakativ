@@ -55,16 +55,18 @@ _formats = {
     "dina4_landscape": (297, 210),
     "dina3_portrait": (297, 420),
     "dina3_landscape": (420, 297),
+    "dina1_portrait": (594, 841),
 }
 
 
 @pytest.mark.parametrize(
-    "postersize,input_pagesize,output_pagesize,expected",
+    "postersize,input_pagesize,output_pagesize,strategy,expected",
     [
         (
             _formats["dina3_portrait"],
             _formats["dina4_portrait"],
-            None,
+            _formats["dina4_portrait"],
+            "simple",
             [
                 (
                     ["0", "380.8549", "337.72779", "841.8898"],
@@ -87,7 +89,8 @@ _formats = {
         (
             _formats["dina3_landscape"],
             _formats["dina4_landscape"],
-            None,
+            _formats["dina4_portrait"],
+            "simple",
             [
                 (
                     ["0", "257.5478", "461.03489", "595.2756"],
@@ -107,9 +110,41 @@ _formats = {
                 ),
             ],
         ),
+        (
+            _formats["dina1_portrait"],
+            _formats["dina4_landscape"],
+            _formats["dina4_portrait"],
+            "complex",
+            [
+                (
+                    ['0', '202.67716', '269.29136', '595.2756'],
+                    ['1.9999999', '0', '0', '1.9999999', '56.692934', '-405.35429'],
+                ),
+                (
+                    ['212.59844', '202.67716', '510.23625', '595.2756'],
+                    ['1.9999999', '0', '0', '1.9999999', '-425.1968', '-405.35429'],
+                ),
+                (
+                    ['449.29136', '325.98423', '841.8898', '595.2756'],
+                    ['1.9999998', '0', '0', '1.9999998', '-898.58267', '-651.9683'],
+                ),
+                (
+                    ['331.65354', '0', '629.2913', '392.59846'],
+                    ['1.9999999', '0', '0', '1.9999999', '-663.307', '56.692934'],
+                ),
+                (
+                    ['572.59848', '0', '841.8898', '392.59846'],
+                    ['1.9999999', '0', '0', '1.9999999', '-1145.1968', '56.692934'],
+                ),
+                (
+                    ['0', '0', '392.59843', '269.29136'],
+                    ['2', '0', '0', '2', '56.692934', '56.69287'],
+                ),
+            ],
+        ),
     ],
 )
-def test_cases(postersize, input_pagesize, output_pagesize, expected):
+def test_cases(postersize, input_pagesize, output_pagesize, strategy, expected):
     width = mm_to_pt(input_pagesize[0])
     height = mm_to_pt(input_pagesize[1])
 
@@ -140,7 +175,9 @@ def test_cases(postersize, input_pagesize, output_pagesize, expected):
 
     fd, outfile = tempfile.mkstemp(prefix="plakativ")
     os.close(fd)
-    plakativ.compute_layout(infile, outfile, mode="size", size=postersize, border=(20, 20, 20, 20))
+    plakativ.compute_layout(
+        infile, outfile, mode="size", size=postersize, pagesize=output_pagesize, border=(20, 20, 20, 20), strategy=strategy
+    )
     os.unlink(infile)
 
     reader = pdfrw.PdfReader(outfile)
