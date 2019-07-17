@@ -16,9 +16,9 @@ Features
 
 Plakativ allows one to create a poster using one of three different approaches:
 
- - I want a poster of size X
- - I want a poster X times the input page page area
- - I have X pages of paper and want to print the biggest possible poster on them
+ - I want a poster that fits into size X
+ - I want a poster Y times the input page page area
+ - I have Z pages of paper and want to print the biggest possible poster on them
 
 Plakativ works on Windows, Linux and MacOS. It offers a GUI based on tkinter, a
 command line interface and can be used as a Python module. Everything is inside
@@ -36,9 +36,35 @@ Demo
 [//]: # (gifsicle -b -O3 plakativ.gif)
 
 The demo shows a user choosing between the three different ways to define the
-poster size. Either my picking a size that the input will be fit into, by
+poster size. Either by picking a size that the input will be fit into, by
 multiplying the area of the input page or by maximizing the poster size, given
 a number of pages one is willing to print on.
+
+Installation
+============
+
+Plakativ is available from pypi: https://pypi.org/project/img2pdf/
+
+Thus you can just run `pip install plakativ` on your platform of choice.
+
+For Microsoft Windows users, PyInstaller based .exe files are produced by
+appveyor. If you don't want to install Python before using img2pdf you can head
+to appveyor and click on "Artifacts" to download the latest version:
+https://ci.appveyor.com/project/josch/plakativ
+
+Complex Layouter
+================
+
+Oftentimes there is a way to create a poster of a specific size with less pages
+than would be needed with a regular arrangement of pages into rows and columns.
+For regular poster sizes, a more complex layout can save up to 3 or 5 pages of
+paper. If the regular simple layout and the complex layout require the same
+number of pages for a particular poster size, then plakativ will fall back to
+the simple layout. The following animation shows the complex layout that
+plakativ chooses when asked to produce the largest possible poster using X
+pages. The number of pages X can be seen in the center.
+
+![](layout.gif)
 
 Bugs
 ====
@@ -55,14 +81,16 @@ While basic functionality is implemented, lots of work remains to be done:
  - print cutting guides
  - changing units
  - changing language
- - adding [advanced and complex layouters](https://stackoverflow.com/questions/39306507/)
  - make PyMuPDF dependency optional
  - optionally, use pdfrw and/or pypdf2 to read/write PDF
  - improve command line interface
  - improve module interface
 
-Comparison to PosteRazor
-------------------------
+Comparison to similar software
+==============================
+
+PosteRazor
+----------
 
 http://posterazor.sourceforge.net/
 
@@ -72,8 +100,8 @@ with the exact same quality as the input. It is thus not necessary anymore
 to first do a lossy rasterization of an input PDF so that one can work with
 PosteRazor.
 
-Comparison to pdfposter
------------------------
+pdfposter
+---------
 
 https://pdfposter.readthedocs.io/en/stable/
 
@@ -82,4 +110,4 @@ https://pdfposter.readthedocs.io/en/stable/
  - no page borders for glueing
  - superfluous empty pages
  - only very simple layouter
- - scaling by width/height makes doubling unintuitive
+ - scaling by width/height instead by area makes doubling unintuitive
