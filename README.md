@@ -43,13 +43,13 @@ a number of pages one is willing to print on.
 Installation
 ============
 
-Plakativ is available from pypi: https://pypi.org/project/img2pdf/
+Plakativ is available from pypi: https://pypi.org/project/plakativ/
 
 Thus you can just run `pip install plakativ` on your platform of choice.
 
 For Microsoft Windows users, PyInstaller based .exe files are produced by
-appveyor. If you don't want to install Python before using img2pdf you can head
-to appveyor and click on "Artifacts" to download the latest version:
+appveyor. If you don't want to install Python before using plakativ you can
+head to appveyor and click on "Artifacts" to download the latest version:
 https://ci.appveyor.com/project/josch/plakativ
 
 Complex Layouter
