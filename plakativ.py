@@ -248,11 +248,6 @@ class Plakativ:
         self.doc = fitz.open(infile)
         self.pagenr = pagenr
 
-        self.border_left = 20
-        self.border_right = 20
-        self.border_top = 20
-        self.border_bottom = 20
-
     # set page number -- first page is 0
     def set_input_pagenr(self, pagenr):
         if pagenr < 0 or pagenr >= len(self.doc):
@@ -747,12 +742,12 @@ class Application(tkinter.Frame):
         top_frame = tkinter.Frame(frame_right)
         top_frame.pack(fill=tkinter.X)
 
-        open_button = tkinter.Button(
-            top_frame, text="Open PDF", command=self.on_open_button
+        tkinter.Button(top_frame, text="Open PDF", command=self.on_open_button).pack(
+            side=tkinter.LEFT, expand=tkinter.TRUE, fill=tkinter.X
         )
-        open_button.pack(side=tkinter.LEFT, expand=tkinter.TRUE, fill=tkinter.X)
-        help_button = tkinter.Button(top_frame, text="Help", state=tkinter.DISABLED)
-        help_button.pack(side=tkinter.RIGHT, expand=tkinter.TRUE, fill=tkinter.X)
+        tkinter.Button(top_frame, text="Help", state=tkinter.DISABLED).pack(
+            side=tkinter.RIGHT, expand=tkinter.TRUE, fill=tkinter.X
+        )
 
         frame1 = VerticalScrolledFrame(frame_right)
         frame1.pack(side=tkinter.TOP, expand=tkinter.TRUE, fill=tkinter.Y)
@@ -771,7 +766,7 @@ class Application(tkinter.Frame):
 
         self.bordersize = BorderSizeWidget(frame1.interior)
         self.bordersize.pack(fill=tkinter.X)
-        self.bordersize.set(20.0, 20.0, 20.0, 20.0)
+        self.bordersize.set(15.0, 15.0, 15.0, 15.0)
         if hasattr(self, "plakativ"):
             self.postersize.callback = self.on_bordersize
 
