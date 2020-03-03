@@ -22,7 +22,7 @@ import argparse
 import os.path
 import platform
 
-VERSION = "0.1"
+VERSION = "0.2"
 
 PAGE_SIZES = OrderedDict(
     [
