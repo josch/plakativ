@@ -181,7 +181,6 @@ def test_cases(postersize, input_pagesize, output_pagesize, strategy, expected):
     os.unlink(infile)
 
     doc = fitz.open(outfile)
-    os.unlink(outfile)
 
     for pnum, (bbox, matrix) in zip(range(doc.pageCount), expected):
         xreflist = doc._getPageInfo(pnum, 3)
@@ -214,3 +213,5 @@ def test_cases(postersize, input_pagesize, output_pagesize, strategy, expected):
         newmatrix = keyvals["/Matrix"].strip(" []").split()
         for v1, v2 in zip(matrix, newmatrix):
             assert math.isclose(float(v1), float(v2), abs_tol=0.00001)
+    doc.close()
+    os.unlink(outfile)
