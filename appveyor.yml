@@ -16,7 +16,7 @@ environment:
     - PYTHON: "C:\\Python37-x64"
 
 install:
-  - "%PYTHON%\\python.exe -m pip install wheel PyMuPDF pytest pdfrw pyinstaller"
+  - "%PYTHON%\\python.exe -m pip install wheel PyMuPDF pytest pyinstaller"
 
 build: off
 

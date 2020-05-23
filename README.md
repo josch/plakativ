@@ -82,7 +82,7 @@ While basic functionality is implemented, lots of work remains to be done:
  - changing units
  - changing language
  - make PyMuPDF dependency optional
- - optionally, use pdfrw and/or pypdf2 to read/write PDF
+ - optionally, use pypdf2 to read/write PDF
  - improve command line interface
  - improve module interface
 

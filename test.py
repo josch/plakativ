@@ -4,7 +4,7 @@ import tempfile
 import fitz
 import fitz.utils
 import os
-import pdfrw
+import math
 
 
 def mm_to_pt(length):
@@ -180,12 +180,37 @@ def test_cases(postersize, input_pagesize, output_pagesize, strategy, expected):
     )
     os.unlink(infile)
 
-    reader = pdfrw.PdfReader(outfile)
+    doc = fitz.open(outfile)
     os.unlink(outfile)
 
-    pages = reader.Root.Pages.Kids
-    assert len(pages) == len(expected)
-
-    for page, (bbox, matrix) in zip(pages, expected):
-        assert page.Resources.XObject.fzFrm0.BBox == bbox
-        assert page.Resources.XObject.fzFrm0.Matrix == matrix
+    for pnum, (bbox, matrix) in zip(range(doc.pageCount), expected):
+        xreflist = doc._getPageInfo(pnum, 3)
+        assert len(xreflist) >= 1
+        xref, name, _, _ = xreflist[0]
+        assert name == "fzFrm0"
+        # doc.xrefObject() will return something like:
+        #      <<
+        #        /Type /XObject
+        #        /Subtype /Form
+        #        /BBox [ 185.47917 262.17189 445.79167 595 ]
+        #        /Matrix [ 2.286773 0 0 2.286773 -424.1487 -599.5276 ]
+        #        /Resources <<
+        #          /XObject <<
+        #            /fullpage 7 0 R
+        #          >>
+        #        >>
+        #        /Length 12
+        #      >>
+        keyvals = dict(
+            tuple(line.strip().split(maxsplit=1))
+            for line in doc.xrefObject(xref).splitlines()
+            if " " in line.strip()
+        )
+        assert "/BBox" in keyvals
+        newbbox = keyvals["/BBox"].strip(" []").split()
+        for v1, v2 in zip(bbox, newbbox):
+            assert math.isclose(float(v1), float(v2), abs_tol=0.00001)
+        assert "/Matrix" in keyvals
+        newmatrix = keyvals["/Matrix"].strip(" []").split()
+        for v1, v2 in zip(matrix, newmatrix):
+            assert math.isclose(float(v1), float(v2), abs_tol=0.00001)
