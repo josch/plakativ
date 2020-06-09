@@ -21,6 +21,15 @@ import sys
 import argparse
 import os.path
 import platform
+from enum import Enum
+from io import BytesIO
+
+have_img2pdf = True
+try:
+    import img2pdf
+except ImportError:
+    have_img2pdf = False
+
 
 VERSION = "0.2"
 
@@ -245,7 +254,26 @@ def complex_cover(n, m, x, y):
 
 class Plakativ:
     def __init__(self, infile, pagenr=0):
-        self.doc = fitz.open(infile)
+        self.doc = None
+        if have_img2pdf:
+            # if we have img2pdf available we can encapsulate a raster image
+            # into a PDF container
+            try:
+                data = img2pdf.convert(infile)
+            except img2pdf.ImageOpenError:
+                # img2pdf cannot handle this
+                pass
+            else:
+                stream = BytesIO()
+                stream.write(data)
+                self.doc = fitz.open(stream=stream, filetype="application/pdf")
+        if self.doc is None:
+            # either we didn't have img2pdf or opening the input with img2pdf
+            # failed
+            if hasattr(infile, "read"):
+                self.doc = fitz.open(stream=infile, filetype="application/pdf")
+            else:
+                self.doc = fitz.open(filename=infile)
         self.pagenr = pagenr
 
     # set page number -- first page is 0

@@ -35,7 +35,7 @@ setup(
     test_suite="tests.test_suite",
     zip_safe=True,
     include_package_data=True,
-    install_requires=["PyMuPDF"],
+    install_requires=["PyMuPDF", "img2pdf"],
     entry_points={
         "setuptools.installation": ["eggsecutable = plakativ:main"],
         "console_scripts": ["plakativ = plakativ:main"],
