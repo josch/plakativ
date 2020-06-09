@@ -31,8 +31,8 @@ setup(
     url="https://gitlab.mister-muffin.de/josch/plakativ",
     download_url="https://gitlab.mister-muffin.de/josch/plakativ/repository/"
     "archive.tar.gz?ref=" + VERSION,
-    py_modules=['plakativ'],
-    test_suite="tests.test_suite",
+    py_modules=["plakativ"],
+    test_suite="pytest",
     zip_safe=True,
     include_package_data=True,
     install_requires=["PyMuPDF", "img2pdf"],
