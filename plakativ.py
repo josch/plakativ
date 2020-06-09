@@ -15,8 +15,6 @@
 from collections import OrderedDict
 import math
 import fitz
-import tkinter
-import tkinter.filedialog
 import sys
 import argparse
 import os.path
@@ -30,6 +28,21 @@ try:
 except ImportError:
     have_img2pdf = False
 
+have_tkinter = True
+try:
+    import tkinter
+    import tkinter.filedialog
+except ImportError:
+    have_tkinter = False
+
+    class dummy:
+        def __init__(self, *args, **kwargs):
+            raise Exception("this functionality needs tkinter")
+
+    tkinter = type("", (), {})()
+    tkinter.Frame = dummy
+    tkinter.Menubutton = dummy
+    tkinter.LabelFrame = dummy
 
 VERSION = "0.2"
 
@@ -47,10 +60,44 @@ PAGE_SIZES = OrderedDict(
         ("Tabloid (11 in × 17 in)", (279.4, 431.8)),
     ]
 )
+papersizes = {
+    "letter": "8.5inx11in",
+    "a0": "841mmx1189mm",
+    "a1": "594mmx841mm",
+    "a2": "420mmx594mm",
+    "a3": "297mmx420mm",
+    "a4": "210mmx297mm",
+    "a5": "148mmx210mm",
+    "a6": "105mmx148mm",
+    "legal": "8.5inx14in",
+    "tabloid": "11inx17in",
+}
+papernames = {
+    "letter": "Letter",
+    "a0": "A0",
+    "a1": "A1",
+    "a2": "A2",
+    "a3": "A3",
+    "a4": "A4",
+    "a5": "A5",
+    "a6": "A6",
+    "legal": "Legal",
+    "tabloid": "Tabloid",
+}
+
+Unit = Enum("Unit", "pt cm mm inch")
 
 
 def mm_to_pt(length):
     return (72.0 * length) / 25.4
+
+
+def cm_to_mm(length):
+    return length * 10.0
+
+
+def in_to_mm(length):
+    return length / 25.4
 
 
 def pt_to_mm(length):
@@ -650,7 +697,12 @@ class Plakativ:
                 clip=sourcerect,  # part of the input page to use
             )
 
-        outdoc.save(outfile, garbage=4, deflate=True)
+        if hasattr(outfile, "write"):
+            # outfile is an object with a write() method
+            outfile.write(outdoc.write(garbage=4, deflate=True))
+        else:
+            # outfile is used as a filename
+            outdoc.save(outfile, garbage=4, deflate=True)
 
 
 # from Python 3.7 Lib/idlelib/configdialog.py
@@ -1680,13 +1732,200 @@ def compute_layout(
 
 
 def gui():
+    if not have_tkinter:
+        raise Exception("the GUI requires tkinter")
     root = tkinter.Tk()
     app = Application(master=root)
     app.mainloop()
 
 
+def parse_num(num, name):
+    if num == "":
+        raise argparse.ArgumentTypeError("%s is empty" % name)
+    unit = None
+    if num.endswith("pt"):
+        unit = Unit.pt
+    elif num.endswith("cm"):
+        unit = Unit.cm
+    elif num.endswith("mm"):
+        unit = Unit.mm
+    elif num.endswith("in"):
+        unit = Unit.inch
+    else:
+        try:
+            num = float(num)
+        except ValueError:
+            msg = (
+                "%s is not a floating point number and doesn't have a "
+                "valid unit: %s" % (name, num)
+            )
+            raise argparse.ArgumentTypeError(msg)
+    if unit is None:
+        unit = Unit.pt
+    else:
+        num = num[:-2]
+        try:
+            num = float(num)
+        except ValueError:
+            msg = "%s is not a floating point number: %s" % (name, num)
+            raise argparse.ArgumentTypeError(msg)
+    if num < 0:
+        msg = "%s must not be negative: %s" % (name, num)
+        raise argparse.ArgumentTypeError(msg)
+    if unit == Unit.cm:
+        num = cm_to_mm(num)
+    elif unit == Unit.pt:
+        num = pt_to_mm(num)
+    elif unit == Unit.inch:
+        num = in_to_mm(num)
+    return num
+
+
+def parse_borderarg(string):
+    if ":" in string:
+        vals = string.split(":")
+        if len(vals) in [0, 1]:
+            raise argparse.ArgumentTypeError("logic error")
+        elif len(vals) == 2:
+            t = b = parse_num(vals[0], "top/bottom border")
+            r = l = parse_num(vals[1], "right/left border")
+        elif len(vals) == 3:
+            t = parse_num(vals[0], "top border")
+            r = l = parse_num(vals[1], "right/left border")
+            b = parse_num(vals[2], "bottom border")
+        elif len(vals) == 4:
+            t = parse_num(vals[0], "top border")
+            r = parse_num(vals[1], "right border")
+            b = parse_num(vals[2], "bottom border")
+            l = parse_num(vals[3], "left border")
+        else:
+            raise argparse.ArgumentTypeError(
+                "border option can not have more than four values"
+            )
+    else:
+        if string == "":
+            raise argparse.ArgumentTypeError("border option cannot be empty")
+        val = parse_num(string, "border")
+        t, r, b, l = val, val, val, val
+    return t, r, b, l
+
+
+def parse_pagesize_rectarg(string):
+    if papersizes.get(string.lower()):
+        string = papersizes[string.lower()]
+    if "x" not in string:
+        # if there is no separating "x" in the string, then the string is
+        # interpreted as the width
+        w = parse_num(string, "width")
+        h = None
+    else:
+        w, h = string.split("x", 1)
+        w = parse_num(w, "width")
+        h = parse_num(h, "height")
+    if w is None and h is None:
+        raise argparse.ArgumentTypeError("at least one dimension must be specified")
+    return w, h
+
+
 def main():
-    parser = argparse.ArgumentParser()
+    rendered_papersizes = ""
+    for k, v in sorted(papersizes.items()):
+        rendered_papersizes += "    %-8s %s\n" % (papernames[k], v)
+
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description="""\
+Create large posters by printing and gluing together smaller pages.
+
+This program is for situations when you want to create a large poster or banner
+but do not have a printer that supports large sheets of paper. Plakativ allows
+one to enlarge and split a PDF across multiple pages, creating another PDF with
+pages of the desired printable size. After printing, the pages can be cut and
+glued together to form a larger poster. Features:
+
+  - lossless operation
+  - no pixel artifacts when upscaling if PDF contains vector graphics
+  - GUI with preview functionality
+  - complex layouter to save paper
+  - optimize by number of pages, output poster size or multiple of input area
+
+Options:
+""",
+        epilog="""\
+Poster size:
+  There are three ways to set the size of the final poster. The desired method
+  is selected using the mutually exclusive options --size, --factor and
+  --maxpages. The --size option allows one to specify a width and height into
+  which the input will be fitted, swapping width and height as necessary, to
+  create the largest possible poster with those dimensions while keeping the
+  aspect ratio of the input. The --factor option scales the area of the input
+  by the given multiplier. If the input is a DIN A4 page, then a factor of 2
+  will create a DIN A3 poster. The --maxpages option allows one to specify a
+  maximum number of pages one is willing to print out and creates the largest
+  possible poster that can possibly be created with the given number of pages.
+  For example, printing a DIN A1 poster on DIN A4 pages with a border of 15 mm
+  will require 15 pages with the simple layouter engine. With --maxpages=15 a
+  slightly larger poster will be generated but will make better use of the
+  available number of pages of paper. Using the complex layouter, an even
+  bigger poster can be generated with just 15 pages of paper by changing the
+  orientation of some of them.
+
+Paper sizes:
+  You can specify the short hand paper size names shown in the first column in
+  the table below as arguments to the --pagesize and --imgsize options.  The
+  width and height they are mapping to is shown in the second column.  Giving
+  the value in the second column has the same effect as giving the short hand
+  in the first column. The values are case insensitive.
+
+%s
+
+Borders, cutting and gluing:
+  The border on each page set using the --border option has two purposes.
+  Firstly, the border is useful for printers that do not support borderless
+  printing. Secondly, the border is the area where the individual pages overlap
+  and can be glued together. Before gluing, cut away the border area where the
+  printer was unable to print on. As long as you stay within the distance set
+  by the --border option, you don't need precision tools to do the cutting but
+  can cut freehand using a pair of scissors. You only need to cut the borders
+  from those edges that will end up being glued onto another piece of paper.
+  By keeping even the area at the border your printer could not print on from
+  the paper at the bottom you maintain a larger area for the glue.
+
+Examples:
+
+To run the tkinter GUI execute either:
+
+    $ plakativ-gui
+    $ plakativ --gui
+
+To use plakativ without GUI from the command line you can run:
+
+    $ plakativ --size A1 --output=poster.pdf input.pdf
+
+This will create a file poster.pdf with multiple DIN A4 pages which, after
+being cut and glued together will form a DIN A1 poster of the content on the
+first page of input.pdf.
+
+Written by Johannes 'josch' Schauer <josch@mister-muffin.de>
+
+Report bugs at https://gitlab.mister-muffin.de/josch/plakativ/issues
+"""
+        % rendered_papersizes,
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Makes the program operate in verbose mode, printing messages on "
+        "standard error.",
+    )
+    parser.add_argument(
+        "-V",
+        "--version",
+        action="version",
+        version="%(prog)s " + VERSION,
+        help="Prints version information and exits.",
+    )
     gui_group = parser.add_mutually_exclusive_group(required=False)
     gui_group.add_argument(
         "--gui",
@@ -1705,11 +1944,75 @@ def main():
     else:
         parser.set_defaults(gui=False)
 
-    parser.add_argument(
-        "--mode", choices=["size", "mult", "npages"], help="select poster size"
+    mode_group = parser.add_mutually_exclusive_group(required=False)
+    mode_group.add_argument(
+        "--size",
+        metavar="LxL",
+        dest="mode",
+        type=parse_pagesize_rectarg,
+        help="Poster width/height either as width times height or one of the "
+        "known paper sizes (see below). Cannot be used together with --factor "
+        "or --maxpages.",
     )
-    parser.add_argument("-o", "--output", help="output file")
-    parser.add_argument("input", nargs="?", help="input file")
+    mode_group.add_argument(
+        "--factor",
+        metavar="MULT",
+        dest="mode",
+        type=float,
+        help="Poster size as multiple of input page area. Cannot be used "
+        "together with --size or --maxpages.",
+    )
+    mode_group.add_argument(
+        "--maxpages",
+        metavar="NUM",
+        dest="mode",
+        type=int,
+        help="Maximum possible poster size with the given number of pages. "
+        "Cannot be used together with --size or --factor.",
+    )
+
+    parser.add_argument("-o", "--output", help="output filename (default: stdout)")
+    parser.add_argument("input", nargs="?", help="input filename (default: stdin)")
+    parser.add_argument(
+        "--pagenum",
+        type=int,
+        default=1,
+        help="Page number of input PDF to turn into a poster (default: 1)",
+    )
+    parser.add_argument(
+        "--pagesize",
+        metavar="LxL",
+        type=parse_pagesize_rectarg,
+        default=(210, 297),
+        help="Width and height of the output pages or one of the known paper "
+        "sizes (see below). This is the paper size that you are printing on "
+        "with your printer (default: A4)",
+    )
+    parser.add_argument(
+        "--border",
+        metavar="L[:L[:L[:L]]]",
+        type=parse_borderarg,
+        default=(15, 15, 15, 15),
+        help="The borders on each output page for gluing. This specifies how "
+        "much the pages overlap each other. If your printer cannot print "
+        "borderless, then this value should also be larger than the border up "
+        "to which your printer is able to print. One value sets the border on "
+        "all four sides. Multiple values are separated by a colon. With two "
+        "values, the first value sets top and bottom border and the second "
+        "value sets left and right border. With three values, the first value "
+        "sets the top border, the second value the left and right border and "
+        "the third value the bottom border. Four values set top, right, "
+        "bottom and left borders in that order.",
+    )
+    parser.add_argument(
+        "--layouter",
+        choices=["simple", "complex"],
+        default="simple",
+        help="The algorithm arranging the individual pages making the poster. "
+        "The simple layout has all pages in the same orientation. The complex "
+        "layout is able to sometimes require less pages for the same poster "
+        "size and is allowed to rotate pages.",
+    )
 
     args = parser.parse_args()
 
@@ -1717,7 +2020,31 @@ def main():
         gui()
         sys.exit(0)
 
-    compute_layout(args.input, args.output, mode=args.mode, size=(297, 420))
+    if not args.input or args.input == "-":
+        args.input = sys.stdin.buffer
+
+    if not args.output or args.output == "-":
+        args.output = sys.stdout.buffer
+
+    if isinstance(args.mode, tuple):
+        mode = "size"
+    elif isinstance(args.mode, float):
+        mode = "mult"
+    elif isinstance(args.mode, int):
+        mode = "npages"
+    else:
+        raise Exception("logic error")
+
+    compute_layout(
+        args.input,
+        args.output,
+        mode,
+        pagenr=args.pagenum - 1,  # zero based
+        pagesize=args.pagesize,
+        border=args.border,
+        strategy=args.layouter,
+        **{mode: args.mode},
+    )
 
 
 if __name__ == "__main__":
