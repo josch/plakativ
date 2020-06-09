@@ -338,11 +338,22 @@ class Plakativ:
         if mode in ["size", "mult"]:
             if mode == "size":
                 # fit the input page size into the selected postersize
-                poster_width = postersize[0]
-                poster_height = (poster_width * inpage_height) / inpage_width
-                if poster_height > postersize[1]:
-                    poster_height = postersize[1]
-                    poster_width = (poster_height * inpage_width) / inpage_height
+                width_portrait = postersize[0]
+                height_portrait = (width_portrait * inpage_height) / inpage_width
+                if height_portrait > postersize[1]:
+                    height_portrait = postersize[1]
+                    width_portrait = (height_portrait * inpage_width) / inpage_height
+                area_portrait = width_portrait * height_portrait
+                width_landscape = postersize[1]
+                height_landscape = (width_landscape * inpage_height) / inpage_width
+                if height_landscape > postersize[0]:
+                    height_landscape = postersize[0]
+                    width_landscape = (height_landscape * inpage_width) / inpage_height
+                area_landscape = width_landscape * height_landscape
+                if area_portrait > area_landscape:
+                    poster_width, poster_height = width_portrait, height_portrait
+                else:
+                    poster_width, poster_height = width_landscape, height_landscape
             elif mode == "mult":
                 area = inpage_width * inpage_height * mult
                 poster_width = math.sqrt(area * inpage_width / inpage_height)

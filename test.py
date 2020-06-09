@@ -55,7 +55,7 @@ _formats = {
     "dina4_landscape": (297, 210),
     "dina3_portrait": (297, 420),
     "dina3_landscape": (420, 297),
-    "dina1_portrait": (594, 841),
+    "dina2_portrait": (420, 594),
 }
 
 
@@ -111,7 +111,7 @@ _formats = {
             ],
         ),
         (
-            _formats["dina1_portrait"],
+            _formats["dina2_portrait"],
             _formats["dina4_landscape"],
             _formats["dina4_portrait"],
             "complex",
