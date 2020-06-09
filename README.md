@@ -7,9 +7,9 @@ plakativ
 Plakativ is German for "striking" or "eye-catching" and comes from the German
 word "Plakat" which means poster in English.
 
-This software allows one to stretch a PDF document across multiple pages that
-can then be printed on a common inkjet or laser printer, cut and glued together into a
-larger poster.
+This software allows one to stretch a PDF document or raster image across
+multiple pages that can then be printed on a common inkjet or laser printer,
+cut and glued together into a larger poster.
 
 Features
 ========
@@ -83,7 +83,6 @@ While basic functionality is implemented, lots of work remains to be done:
  - changing language
  - make PyMuPDF dependency optional
  - optionally, use pypdf2 to read/write PDF
- - improve command line interface
  - improve module interface
 
 Comparison to similar software
@@ -107,7 +106,7 @@ https://pdfposter.readthedocs.io/en/stable/
 
  - no GUI
  - cumbersome box definition
- - no page borders for glueing
+ - no page borders for gluing
  - superfluous empty pages
  - only very simple layouter
  - scaling by width/height instead by area makes doubling unintuitive
