@@ -270,7 +270,13 @@ class Plakativ:
         pix = (
             self.doc[self.pagenr].getDisplayList().getPixmap(matrix=mat_0, alpha=False)
         )
-        return pix.getImageData("ppm")
+        # the getImageData() function was only introduced in pymupdf 1.14.5
+        if hasattr(pix, "getImageData"):
+            return pix.getImageData("ppm")
+        else:
+            # this is essentially the same thing that the getImageData()
+            # function does
+            return pix._getImageData(2)  # 2 stands for pgm/ppm/pbm
 
     def compute_layout(
         self,
