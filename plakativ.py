@@ -1059,10 +1059,15 @@ class Application(tkinter.Frame):
     def on_open_button(self):
         filename = tkinter.filedialog.askopenfilename(
             parent=self.master,
-            title="foobar",
-            filetypes=[("pdf documents", "*.pdf"), ("all files", "*")],
-            initialdir="/home/josch/git/plakativ",
-            initialfile="test.pdf",
+            title="Open either a PDF or a raster image",
+            filetypes=[
+                ("pdf documents", "*.pdf"),
+                ("png images", "*.png"),
+                ("jpg images", "*.jpg"),
+                ("all files", "*"),
+            ],
+            # initialdir="/home/josch/git/plakativ",
+            # initialfile="test.pdf",
         )
         if filename == ():
             return
@@ -1102,10 +1107,10 @@ class Application(tkinter.Frame):
         base, ext = os.path.splitext(os.path.basename(self.filename))
         filename = tkinter.filedialog.asksaveasfilename(
             parent=self.master,
-            title="foobar",
+            title="Save as PDF",
             defaultextension=".pdf",
             filetypes=[("pdf documents", "*.pdf"), ("all files", "*")],
-            initialdir="/home/josch/git/plakativ",
+            initialdir=os.path.dirname(self.filename),
             initialfile=base + "_poster" + ext,
         )
         if filename == "":
