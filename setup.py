@@ -41,4 +41,9 @@ setup(
         "console_scripts": ["plakativ = plakativ:main"],
         "gui_scripts": ["plakativ-gui = plakativ:gui"],
     },
+    data_files=[
+        ("share/applications", ["de.mister-muffin.plakativ.desktop"]),
+        ("share/pixmaps", ["plakativ.svg"]),
+        ("share/metainfo", ["plakativ.appdata.xml"]),
+    ],
 )

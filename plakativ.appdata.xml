@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component type="desktop-application">
+  <id>de.mister-muffin.plakativ</id>
+  <launchable type="desktop-id">de.mister-muffin.plakativ.desktop</launchable>
+  <name>Plakativ</name>
+  <summary>Create large posters by printing and gluing together smaller pages</summary>
+
+  <metadata_license>FSFAP</metadata_license>
+  <project_license>GPL-3.0</project_license>
+  <developer_name>Johannes Schauer</developer_name>
+
+  <description>
+    <p>
+ This program is for situations when you want to create a large poster or
+ banner but do not have a printer that supports large sheets of paper. Plakativ
+ allows one to enlarge and split a PDF across multiple pages, creating another
+ PDF with pages of the desired printable size. After printing, the pages can be
+ cut and glued together to form a larger poster.
+    </p>
+  </description>
+
+  <screenshots>
+   <screenshot type="default">
+      <image>https://gitlab.mister-muffin.de/josch/plakativ/raw/master/demo.gif</image>
+    </screenshot>
+  </screenshots>
+
+  <url type="homepage">https://gitlab.mister-muffin.de/josch/plakativ</url>
+  <url type="bugtracker">https://gitlab.mister-muffin.de/josch/plakativ/issues</url>
+  <!--<url type="help"></url>-->
+
+  <updatecontact></updatecontact>
+
+  <provides>
+    <binary>plakativ-gui</binary>
+  </provides>
+
+</component>

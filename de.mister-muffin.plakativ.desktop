@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Plakativ
+Exec=plakativ-gui %f
+Type=Application
+Icon=plakativ
+Categories=Utility;Graphics
+Comment=Create large posters by printing and gluing together smaller pages
+Terminal=false
+MimeType=application/pdf;application/epub+zip;application/vnd.ms-xpsdocument;
