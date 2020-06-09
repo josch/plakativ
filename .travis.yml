@@ -27,4 +27,4 @@ matrix:
 install: pip install wheel PyMuPDF pytest pdfrw
 script:
   - python --version
-  - python -m pytest test.py
+  - python -m pytest
