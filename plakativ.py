@@ -845,13 +845,13 @@ class Application(tkinter.Frame):
         self.pagesize.pack(fill=tkinter.X)
         self.pagesize.set(False, (210, 297))
         if hasattr(self, "plakativ"):
-            self.postersize.callback = self.on_pagesize
+            self.pagesize.callback = self.on_pagesize
 
         self.bordersize = BorderSizeWidget(frame1.interior)
         self.bordersize.pack(fill=tkinter.X)
         self.bordersize.set(15.0, 15.0, 15.0, 15.0)
         if hasattr(self, "plakativ"):
-            self.postersize.callback = self.on_bordersize
+            self.bordersize.callback = self.on_bordersize
 
         self.postersize = PostersizeWidget(frame1.interior)
         self.postersize.pack(fill=tkinter.X)
@@ -863,7 +863,7 @@ class Application(tkinter.Frame):
         self.layouter.pack(fill=tkinter.X)
         self.layouter.set("simple")
         if hasattr(self, "plakativ"):
-            self.postersize.callback = self.on_layouter
+            self.layouter.callback = self.on_layouter
 
         output_group = tkinter.LabelFrame(frame1.interior, text="Output options")
         output_group.pack(fill=tkinter.X)
