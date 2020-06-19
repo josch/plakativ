@@ -2125,7 +2125,12 @@ Report bugs at https://gitlab.mister-muffin.de/josch/plakativ/issues
     elif isinstance(args.mode, int):
         mode = "npages"
     else:
-        raise Exception("logic error")
+        print(
+            "Error: must supply one of --size, --factor or --maxpages\n",
+            file=sys.stderr,
+        )
+        parser.print_usage(sys.stderr)
+        sys.exit(1)
 
     compute_layout(
         args.input,
