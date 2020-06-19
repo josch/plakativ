@@ -77,8 +77,6 @@ TODO
 While basic functionality is implemented, lots of work remains to be done:
 
  - help button
- - print poster borders
- - print cutting guides
  - changing units
  - changing language
  - make PyMuPDF dependency optional

@@ -620,7 +620,7 @@ class Plakativ:
 
         return postersize, mult, npages
 
-    def render(self, outfile):
+    def render(self, outfile, cover=False, guides=False, numbers=False, border=False):
         if not hasattr(self, "layout"):
             raise LayoutNotComputedException()
 
@@ -628,7 +628,85 @@ class Plakativ:
 
         outdoc = fitz.open()
 
-        for (x, y, portrait) in self.layout["positions"]:
+        if cover:
+            # factor to convert from output poster dimensions (given in mm) into
+            # pdf dimensions (given in pt)
+            zoom_1 = min(
+                mm_to_pt(
+                    self.layout["output_pagesize"][0]
+                    - 2 * max(self.layout["border_left"], self.layout["border_right"])
+                )
+                / (self.layout["overallsize"][0]),
+                mm_to_pt(
+                    self.layout["output_pagesize"][1]
+                    - 2 * max(self.layout["border_top"], self.layout["border_bottom"])
+                )
+                / (self.layout["overallsize"][1]),
+            )
+            page = outdoc.newPage(
+                -1,  # insert after last page
+                width=mm_to_pt(self.layout["output_pagesize"][0]),
+                height=mm_to_pt(self.layout["output_pagesize"][1]),
+            )
+            for i, (x, y, portrait) in enumerate(self.layout["positions"]):
+                x0 = (x + self.layout["posterpos"][0]) * zoom_1 + (
+                    mm_to_pt(self.layout["output_pagesize"][0])
+                    - zoom_1 * self.layout["overallsize"][0]
+                ) / 2
+                y0 = (y + self.layout["posterpos"][1]) * zoom_1 + (
+                    mm_to_pt(self.layout["output_pagesize"][1])
+                    - zoom_1 * self.layout["overallsize"][1]
+                ) / 2
+                if portrait:
+                    page_width = self.layout["output_pagesize"][0] * zoom_1
+                    page_height = self.layout["output_pagesize"][1] * zoom_1
+                    top = self.layout["border_top"] * zoom_1
+                    right = self.layout["border_right"] * zoom_1
+                    bottom = self.layout["border_bottom"] * zoom_1
+                    left = self.layout["border_left"] * zoom_1
+                else:
+                    # page is rotated 90 degrees clockwise
+                    page_width = self.layout["output_pagesize"][1] * zoom_1
+                    page_height = self.layout["output_pagesize"][0] * zoom_1
+                    top = self.layout["border_left"] * zoom_1
+                    right = self.layout["border_top"] * zoom_1
+                    bottom = self.layout["border_right"] * zoom_1
+                    left = self.layout["border_bottom"] * zoom_1
+                # inner rectangle
+                shape = page.newShape()
+                shape.drawRect(
+                    fitz.Rect(
+                        x0,
+                        y0,
+                        x0 + page_width - left - right,
+                        y0 + page_height - top - bottom,
+                    )
+                )
+                shape.finish(color=(0, 0, 1))
+                # outer rectangle
+                shape.drawRect(
+                    fitz.Rect(
+                        x0 - left,
+                        y0 - top,
+                        x0 - left + page_width,
+                        y0 - top + page_height,
+                    )
+                )
+                shape.finish(color=(1, 0, 0))
+                shape.insertTextbox(
+                    fitz.Rect(
+                        x0 + 5,
+                        y0 + 5,
+                        x0 + page_width - left - right - 5,
+                        y0 + page_height - top - bottom - 5,
+                    ),
+                    "%d" % (i + 1),
+                    fontsize=20,
+                    color=(0, 0, 0),
+                )
+                shape.commit()
+
+        for i, (x, y, portrait) in enumerate(self.layout["positions"]):
             if portrait:
                 page_width = mm_to_pt(self.layout["output_pagesize"][0])
                 page_height = mm_to_pt(self.layout["output_pagesize"][1])
@@ -685,6 +763,90 @@ class Plakativ:
                 self.pagenr,  # input page number
                 clip=sourcerect,  # part of the input page to use
             )
+
+            shape = page.newShape()
+            if guides:
+                if portrait:
+                    shape.drawRect(
+                        fitz.Rect(
+                            mm_to_pt(self.layout["border_left"]),
+                            mm_to_pt(self.layout["border_top"]),
+                            page_width - mm_to_pt(self.layout["border_right"]),
+                            page_height - mm_to_pt(self.layout["border_bottom"]),
+                        )
+                    )
+                else:
+                    shape.drawRect(
+                        fitz.Rect(
+                            mm_to_pt(self.layout["border_bottom"]),
+                            mm_to_pt(self.layout["border_left"]),
+                            page_width - mm_to_pt(self.layout["border_top"]),
+                            page_height - mm_to_pt(self.layout["border_right"]),
+                        )
+                    )
+                shape.finish(width=0.2, color=(0.5, 0.5, 0.5), dashes="[5 6 1 6]")
+            if numbers:
+                if portrait:
+                    shape.insertTextbox(
+                        fitz.Rect(
+                            mm_to_pt(self.layout["border_left"]) + 5,
+                            mm_to_pt(self.layout["border_top"]) + 5,
+                            page_width - mm_to_pt(self.layout["border_right"]) - 5,
+                            page_height - mm_to_pt(self.layout["border_bottom"]) - 5,
+                        ),
+                        "%d" % (i + 1),
+                        fontsize=8,
+                        color=(0.5, 0.5, 0.5),
+                    )
+                else:
+                    shape.insertTextbox(
+                        fitz.Rect(
+                            mm_to_pt(self.layout["border_bottom"]) + 5,
+                            mm_to_pt(self.layout["border_left"]) + 5,
+                            page_width - mm_to_pt(self.layout["border_top"]) - 5,
+                            page_height - mm_to_pt(self.layout["border_right"]) - 5,
+                        ),
+                        "%d" % (i + 1),
+                        fontsize=8,
+                        color=(0.5, 0.5, 0.5),
+                    )
+            if border:
+                if portrait:
+                    shape.drawRect(
+                        fitz.Rect(
+                            mm_to_pt(self.layout["border_left"] - x),
+                            mm_to_pt(self.layout["border_top"] - y),
+                            mm_to_pt(
+                                self.layout["border_left"]
+                                - x
+                                + self.layout["postersize"][0]
+                            ),
+                            mm_to_pt(
+                                self.layout["border_top"]
+                                - y
+                                + self.layout["postersize"][1]
+                            ),
+                        )
+                    )
+                else:
+                    shape.drawRect(
+                        fitz.Rect(
+                            mm_to_pt(self.layout["border_bottom"] - x),
+                            mm_to_pt(self.layout["border_left"] - y),
+                            mm_to_pt(
+                                self.layout["border_bottom"]
+                                - x
+                                + self.layout["postersize"][0]
+                            ),
+                            mm_to_pt(
+                                self.layout["border_left"]
+                                - y
+                                + self.layout["postersize"][1]
+                            ),
+                        )
+                    )
+                shape.finish(width=0.2, color=(0.5, 0.5, 0.5), dashes="[1 1]")
+            shape.commit()
 
         if hasattr(outfile, "write"):
             # outfile is an object with a write() method
@@ -865,21 +1027,8 @@ class Application(tkinter.Frame):
         if hasattr(self, "plakativ"):
             self.layouter.callback = self.on_layouter
 
-        output_group = tkinter.LabelFrame(frame1.interior, text="Output options")
-        output_group.pack(fill=tkinter.X)
-
-        tkinter.Checkbutton(
-            output_group, text="Print cutting guides", state=tkinter.DISABLED
-        ).pack(anchor=tkinter.W)
-        tkinter.Checkbutton(
-            output_group, text="Print poster border", state=tkinter.DISABLED
-        ).pack(anchor=tkinter.W)
-        tkinter.Checkbutton(
-            output_group, text="Print page number", state=tkinter.DISABLED
-        ).pack(anchor=tkinter.W)
-        tkinter.Checkbutton(
-            output_group, text="Print layout cover page", state=tkinter.DISABLED
-        ).pack(anchor=tkinter.W)
+        self.outopts = OutOptsWidget(frame1.interior)
+        self.outopts.pack(fill=tkinter.X)
 
         option_group = tkinter.LabelFrame(frame1.interior, text="Program options")
         option_group.pack(fill=tkinter.X)
@@ -1205,7 +1354,13 @@ class Application(tkinter.Frame):
         )
         if filename == "":
             return
-        self.plakativ.render(filename)
+        self.plakativ.render(
+            filename,
+            cover=self.outopts.variables["cover"].get(),
+            guides=self.outopts.variables["guides"].get(),
+            numbers=self.outopts.variables["numbers"].get(),
+            border=self.outopts.variables["border"].get(),
+        )
 
 
 class LayouterWidget(tkinter.LabelFrame):
@@ -1250,6 +1405,31 @@ class LayouterWidget(tkinter.LabelFrame):
         self.value = strategy
         if self.variables["strategy"].get() != strategy:
             self.variables["strategy"].set(strategy)
+
+
+class OutOptsWidget(tkinter.LabelFrame):
+    def __init__(self, parent, *args, **kw):
+        tkinter.LabelFrame.__init__(self, parent, text="Output options", *args, **kw)
+
+        self.variables = {
+            "guides": tkinter.IntVar(),
+            "border": tkinter.IntVar(),
+            "numbers": tkinter.IntVar(),
+            "cover": tkinter.IntVar(),
+        }
+
+        tkinter.Checkbutton(
+            self, text="Print cutting guides", variable=self.variables["guides"]
+        ).pack(anchor=tkinter.W)
+        tkinter.Checkbutton(
+            self, text="Print poster border", variable=self.variables["border"]
+        ).pack(anchor=tkinter.W)
+        tkinter.Checkbutton(
+            self, text="Print page number", variable=self.variables["numbers"]
+        ).pack(anchor=tkinter.W)
+        tkinter.Checkbutton(
+            self, text="Print layout cover page", variable=self.variables["cover"]
+        ).pack(anchor=tkinter.W)
 
 
 class InputWidget(tkinter.LabelFrame):
@@ -1764,6 +1944,10 @@ def compute_layout(
     border=(0, 0, 0, 0),
     strategy="simple",
     remove_alpha=False,
+    cover=False,
+    guides=False,
+    numbers=False,
+    poster_border=False,
 ):
     doc = None
     if have_img2pdf:
@@ -1803,7 +1987,7 @@ def compute_layout(
             doc = fitz.open(filename=infile)
     plakativ = Plakativ(doc, pagenr)
     plakativ.compute_layout(mode, size, mult, npages, pagesize, border, strategy)
-    plakativ.render(outfile)
+    plakativ.render(outfile, cover, guides, numbers, poster_border)
 
 
 def gui(filename=None):
@@ -2105,6 +2289,36 @@ Report bugs at https://gitlab.mister-muffin.de/josch/plakativ/issues
         "plakativ can remove the alpha channel for you. The resulting PDF "
         "poster might not be lossless anymore.",
     )
+    parser.add_argument(
+        "--cover-page",
+        action="store_true",
+        help="Add a cover page as the first page which shows the resulting "
+        "layout. This is especially interesting for the complex layouter "
+        "unless you like puzzles.",
+    )
+    parser.add_argument(
+        "--cutting-guides",
+        action="store_true",
+        help="Print light-gray dashed lines that surround the visible part "
+        "of each page and can help with easier cutting and gluing of the "
+        "pages. This is generally only needed if the poster does not contain "
+        "enough detail for accurate gluing.",
+    )
+    parser.add_argument(
+        "--page-numbers",
+        action="store_true",
+        help="Print a small number of each page to uniquely identify each "
+        "sheet. This is especially useful in combination with --cover-page "
+        "because the numbers on the cover page correspond to the page numbers.",
+    )
+    parser.add_argument(
+        "--poster-border",
+        action="store_true",
+        help="If the poster itself has a white background and it is important "
+        "that the final result has precisely the desired poster size, then "
+        "this option will print a light-gray dashed border around the whole "
+        "poster, so that it can be accurately cut to the correct overall size.",
+    )
 
     args = parser.parse_args()
 
@@ -2142,6 +2356,10 @@ Report bugs at https://gitlab.mister-muffin.de/josch/plakativ/issues
         strategy=args.layouter,
         **{mode: args.mode},
         remove_alpha=args.remove_alpha,
+        cover=args.cover_page,
+        guides=args.cutting_guides,
+        numbers=args.page_numbers,
+        poster_border=args.poster_border,
     )
 
 
