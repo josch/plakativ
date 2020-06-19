@@ -32,6 +32,7 @@ have_tkinter = True
 try:
     import tkinter
     import tkinter.filedialog
+    import tkinter.messagebox
 except ImportError:
     have_tkinter = False
 
@@ -300,20 +301,8 @@ def complex_cover(n, m, x, y):
 
 
 class Plakativ:
-    def __init__(self, infile, pagenr=0):
-        self.doc = None
-        if have_img2pdf:
-            # if we have img2pdf available we can encapsulate a raster image
-            # into a PDF container
-            try:
-                data = img2pdf.convert(infile)
-            except img2pdf.ImageOpenError:
-                # img2pdf cannot handle this
-                pass
-            else:
-                stream = BytesIO()
-                stream.write(data)
-                self.doc = fitz.open(stream=stream, filetype="application/pdf")
+    def __init__(self, doc=None, pagenr=0):
+        self.doc = doc
         if self.doc is None:
             # either we didn't have img2pdf or opening the input with img2pdf
             # failed
@@ -818,15 +807,12 @@ class OptionMenu(tkinter.Menubutton):
 
 
 class Application(tkinter.Frame):
-    def __init__(self, master=None, plakativ=None):
+    def __init__(self, master=None):
         super().__init__(master)
         self.master = master
         self.master.title("plakativ")
 
         self.pack(fill=tkinter.BOTH, expand=tkinter.TRUE)
-
-        if plakativ is not None:
-            self.plakativ = plakativ
 
         self.canvas = tkinter.Canvas(self, bg="black")
         self.canvas.pack(fill=tkinter.BOTH, side=tkinter.LEFT, expand=tkinter.TRUE)
@@ -1109,22 +1095,74 @@ class Application(tkinter.Frame):
         # print("saved ", filename)
 
     def on_open_button(self):
+        if have_img2pdf:
+            filetypes = [
+                ("all supported", "*.pdf *.png *.jpg *.jpeg *.gif *.tiff *.tif"),
+                ("pdf documents", "*.pdf"),
+                ("png images", "*.png"),
+                ("jpg images", "*.jpg *.jpeg"),
+                ("gif images", "*.gif"),
+                ("tiff images", "*.tiff *.tif"),
+                ("all files", "*"),
+            ]
+        else:
+            filetypes = [
+                ("pdf documents", "*.pdf"),
+                ("all files", "*"),
+            ]
         filename = tkinter.filedialog.askopenfilename(
             parent=self.master,
             title="Open either a PDF or a raster image",
-            filetypes=[
-                ("pdf documents", "*.pdf"),
-                ("png images", "*.png"),
-                ("jpg images", "*.jpg"),
-                ("all files", "*"),
-            ],
+            filetypes=filetypes
             # initialdir="/home/josch/git/plakativ",
             # initialfile="test.pdf",
         )
         if filename == ():
             return
+        self.open_file(filename)
+
+    def open_file(self, filename):
         self.filename = filename
-        self.plakativ = Plakativ(self.filename)
+        doc = None
+        if have_img2pdf:
+            # if we have img2pdf available we can encapsulate a raster image
+            # into a PDF container
+            data = None
+            try:
+                data = img2pdf.convert(self.filename)
+            except img2pdf.AlphaChannelError:
+                remove_alpha = tkinter.messagebox.askyesno(
+                    title="Removing Alpha Channel",
+                    message="PDF does not support alpha channels. Should the "
+                    "alpha channel be removed? The resulting PDF might not be "
+                    "lossless anymore.",
+                )
+                # remove alpha channel
+                if remove_alpha:
+                    from PIL import Image
+
+                    img = Image.open(self.filename).convert("RGBA")
+                    background = Image.new("RGBA", img.size, (255, 255, 255))
+                    img = Image.alpha_composite(background, img)
+                    with BytesIO() as output:
+                        img.convert("RGB").save(output, format="PNG")
+                        output.seek(0)
+                        data = img2pdf.convert(output)
+                else:
+                    return
+            except img2pdf.ImageOpenError:
+                # img2pdf cannot handle this
+                pass
+
+            if data is not None:
+                stream = BytesIO()
+                stream.write(data)
+                doc = fitz.open(stream=stream, filetype="application/pdf")
+        if doc is None:
+            # either we didn't have img2pdf or opening the input with img2pdf
+            # failed
+            doc = fitz.open(filename=self.filename)
+        self.plakativ = Plakativ(doc)
         # compute the splitting with the current values
         mode, (custom_size, size), mult, npages = self.postersize.value
         _, pagesize = self.pagesize.value
@@ -1725,17 +1763,56 @@ def compute_layout(
     pagesize=(210, 297),
     border=(0, 0, 0, 0),
     strategy="simple",
+    remove_alpha=False,
 ):
-    plakativ = Plakativ(infile, pagenr)
+    doc = None
+    if have_img2pdf:
+        # if we have img2pdf available we can encapsulate a raster image
+        # into a PDF container
+        data = None
+        try:
+            data = img2pdf.convert(infile)
+        except img2pdf.AlphaChannelError:
+            if remove_alpha:
+                # remove alpha channel
+                from PIL import Image
+
+                img = Image.open(infile).convert("RGBA")
+                background = Image.new("RGBA", img.size, (255, 255, 255))
+                img = Image.alpha_composite(background, img)
+                with BytesIO() as output:
+                    img.convert("RGB").save(output, format="PNG")
+                    output.seek(0)
+                    data = img2pdf.convert(output)
+            else:
+                raise
+        except img2pdf.ImageOpenError:
+            # img2pdf cannot handle this
+            pass
+
+        if data is not None:
+            stream = BytesIO()
+            stream.write(data)
+            doc = fitz.open(stream=stream, filetype="application/pdf")
+    if doc is None:
+        # either we didn't have img2pdf or opening the input with img2pdf
+        # failed
+        if hasattr(infile, "read"):
+            doc = fitz.open(stream=infile, filetype="application/pdf")
+        else:
+            doc = fitz.open(filename=infile)
+    plakativ = Plakativ(doc, pagenr)
     plakativ.compute_layout(mode, size, mult, npages, pagesize, border, strategy)
     plakativ.render(outfile)
 
 
-def gui():
+def gui(filename=None):
     if not have_tkinter:
         raise Exception("the GUI requires tkinter")
     root = tkinter.Tk()
     app = Application(master=root)
+    if filename is not None:
+        app.open_file(filename)
     app.mainloop()
 
 
@@ -1848,6 +1925,7 @@ glued together to form a larger poster. Features:
   - GUI with preview functionality
   - complex layouter to save paper
   - optimize by number of pages, output poster size or multiple of input area
+  - support for raster images as input if img2pdf is available
 
 Options:
 """,
@@ -1905,6 +1983,13 @@ To use plakativ without GUI from the command line you can run:
 This will create a file poster.pdf with multiple DIN A4 pages which, after
 being cut and glued together will form a DIN A1 poster of the content on the
 first page of input.pdf.
+
+If img2pdf is available as a Python module, then plakativ can also use raster
+images as input. Since img2pdf refuses to work on images with an alpha channel,
+you can instruct plakativ to remove the alpha channel for you with the
+--remove-alpha flag:
+
+    $ plakativ --size A1 --output=poster.pdf --remove-alpha input.png
 
 Written by Johannes 'josch' Schauer <josch@mister-muffin.de>
 
@@ -2013,11 +2098,18 @@ Report bugs at https://gitlab.mister-muffin.de/josch/plakativ/issues
         "layout is able to sometimes require less pages for the same poster "
         "size and is allowed to rotate pages.",
     )
+    parser.add_argument(
+        "--remove-alpha",
+        action="store_true",
+        help="When the input is a raster image instead of a PDF document, "
+        "plakativ can remove the alpha channel for you. The resulting PDF "
+        "poster might not be lossless anymore.",
+    )
 
     args = parser.parse_args()
 
     if args.gui:
-        gui()
+        gui(args.input)
         sys.exit(0)
 
     if not args.input or args.input == "-":
@@ -2044,6 +2136,7 @@ Report bugs at https://gitlab.mister-muffin.de/josch/plakativ/issues
         border=args.border,
         strategy=args.layouter,
         **{mode: args.mode},
+        remove_alpha=args.remove_alpha,
     )
 
 
