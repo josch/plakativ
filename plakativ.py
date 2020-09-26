@@ -785,7 +785,7 @@ class Plakativ:
                             page_height - mm_to_pt(self.layout["border_right"]),
                         )
                     )
-                shape.finish(width=0.2, color=(0.5, 0.5, 0.5), dashes="[5 6 1 6]")
+                shape.finish(width=0.2, color=(0.5, 0.5, 0.5), dashes="[5 6 1 6] 0")
             if numbers:
                 if portrait:
                     shape.insertTextbox(
@@ -846,7 +846,7 @@ class Plakativ:
                             ),
                         )
                     )
-                shape.finish(width=0.2, color=(0.5, 0.5, 0.5), dashes="[1 1]")
+                shape.finish(width=0.2, color=(0.5, 0.5, 0.5), dashes="[1 1] 0")
             shape.commit()
 
         if hasattr(outfile, "write"):
