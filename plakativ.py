@@ -1951,6 +1951,12 @@ def compute_layout(
     poster_border=False,
 ):
     doc = None
+    if hasattr(infile, "read"):
+        # we have to slurp in the whole file because we potentially read it
+        # in multiple times in case img2pdf is installed
+        # also, mupdf needs to be able to seek(), so we need to slurp it in
+        # anyways
+        infile = BytesIO(infile.read())
     if have_img2pdf:
         # if we have img2pdf available we can encapsulate a raster image
         # into a PDF container
