@@ -2106,6 +2106,15 @@ def parse_pagesize_rectarg(string):
 
 
 def main():
+    if len(sys.argv) == 1 and platform.system() != "Windows":
+        print("""
+You called plakativ without arguments. At least one of the options --size,
+--factor or --maxpages is required for running plakativ on the command line.
+But maybe you meant to run the plakativ GUI instead? On platforms other than
+Windows, the default is to run the command line interface. To run the graphical
+user interface, run plakativ with the --gui option instead.
+""", file=sys.stderr)
+
     rendered_papersizes = ""
     for k, v in sorted(papersizes.items()):
         rendered_papersizes += "    %-8s %s\n" % (papernames[k], v)
