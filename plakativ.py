@@ -21,6 +21,7 @@ import os.path
 import platform
 from enum import Enum
 from io import BytesIO
+import logging
 
 have_img2pdf = True
 try:
@@ -1955,6 +1956,9 @@ def compute_layout(
         # into a PDF container
         data = None
         try:
+            # FIXME: img2pdf should not use the root logger so that instead we
+            #        can run logging.getLogger('img2pdf').setLevel(logging.CRITICAL)
+            logging.getLogger().setLevel(logging.CRITICAL)
             data = img2pdf.convert(infile)
         except img2pdf.AlphaChannelError:
             if remove_alpha:
@@ -1969,7 +1973,14 @@ def compute_layout(
                     output.seek(0)
                     data = img2pdf.convert(output)
             else:
-                raise
+                print(
+                    """
+Plakativ is lossless by default. To automatically remove the alpha channel from
+the input and place the image on a white background, use the --remove-alpha
+option""",
+                    file=sys.stderr,
+                )
+                exit(1)
         except img2pdf.ImageOpenError:
             # img2pdf cannot handle this
             pass
