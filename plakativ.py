@@ -2005,6 +2005,7 @@ option""",
     plakativ = Plakativ(doc, pagenr)
     plakativ.compute_layout(mode, size, mult, npages, pagesize, border, strategy)
     plakativ.render(outfile, cover, guides, numbers, poster_border)
+    doc.close()
 
 
 def gui(filename=None):

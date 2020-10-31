@@ -172,6 +172,7 @@ def test_cases(postersize, input_pagesize, output_pagesize, strategy, expected):
     )
     os.close(fd)
     doc.save(infile, pretty=True, expand=255)
+    doc.close()
 
     fd, outfile = tempfile.mkstemp(prefix="plakativ")
     os.close(fd)
