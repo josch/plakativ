@@ -99,7 +99,7 @@ def cm_to_mm(length):
 
 
 def in_to_mm(length):
-    return length / 25.4
+    return length * 25.4
 
 
 def pt_to_mm(length):
