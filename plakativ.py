@@ -1800,7 +1800,7 @@ class PostersizeWidget(tkinter.LabelFrame):
         ).grid(row=4, column=0, columnspan=3, sticky=tkinter.W)
         tkinter.Label(
             self,
-            text="Multipler:",
+            text="Multiplier:",
             state=tkinter.DISABLED,
             name="mult_label_multiplier",
         ).grid(row=5, column=0, sticky=tkinter.W, padx=(27, 0))
