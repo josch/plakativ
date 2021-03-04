@@ -2037,7 +2037,7 @@ def parse_num(num, name):
             )
             raise argparse.ArgumentTypeError(msg)
     if unit is None:
-        unit = Unit.pt
+        unit = Unit.mm
     else:
         num = num[:-2]
         try:
@@ -2289,7 +2289,8 @@ Report bugs at https://gitlab.mister-muffin.de/josch/plakativ/issues
         help="The borders on each output page for gluing. This specifies how "
         "much the pages overlap each other. If your printer cannot print "
         "borderless, then this value should also be larger than the border up "
-        "to which your printer is able to print. One value sets the border on "
+        "to which your printer is able to print. The default unit is mm. "
+        "Other possible units are cm, in and pt. One value sets the border on "
         "all four sides. Multiple values are separated by a colon. With two "
         "values, the first value sets top and bottom border and the second "
         "value sets left and right border. With three values, the first value "
