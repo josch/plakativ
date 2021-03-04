@@ -1815,9 +1815,6 @@ class PostersizeWidget(tkinter.LabelFrame):
             state=tkinter.DISABLED,
             name="mult_spinbox_multiplier",
         ).grid(row=5, column=1, sticky=tkinter.W)
-        tkinter.Label(
-            self, text="%", state=tkinter.DISABLED, name="mult_label_perc"
-        ).grid(row=5, column=2, sticky=tkinter.W)
 
         tkinter.Radiobutton(
             self,
