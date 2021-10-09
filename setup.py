@@ -5,7 +5,7 @@ VERSION = "0.4"
 setup(
     name="plakativ",
     version=VERSION,
-    author="Johannes 'josch' Schauer",
+    author="Johannes Schauer Marin Rodrigues",
     author_email="josch@mister-muffin.de",
     description="Convert a PDF into a large poster that can be printed on multiple smaller pages.",
     long_description="file: README.md, CHANGELOG.rst",

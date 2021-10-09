@@ -6,7 +6,7 @@
 # pieces and putting each of them onto a paper size that can be printed
 # normally. The result can then be glued together into a bigger poster.
 #
-# Copyright (C) 2019 Johannes 'josch' Schauer
+# Copyright (C) 2019 - 2021 Johannes Schauer Marin Rodrigues <josch@mister-muffin.de>
 #
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License version 3 as published by the
@@ -2202,7 +2202,7 @@ you can instruct plakativ to remove the alpha channel for you with the
 
     $ plakativ --size A1 --output=poster.pdf --remove-alpha input.png
 
-Written by Johannes 'josch' Schauer <josch@mister-muffin.de>
+Written by Johannes Schauer Marin Rodrigues <josch@mister-muffin.de>
 
 Report bugs at https://gitlab.mister-muffin.de/josch/plakativ/issues
 """
