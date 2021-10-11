@@ -879,7 +879,7 @@ class VerticalScrolledFrame(tkinter.Frame):
             borderwidth=0,
             highlightthickness=0,
             yscrollcommand=vscrollbar.set,
-            width=240*parent.winfo_fpixels('1i')/96.0,
+            width=240 * parent.winfo_fpixels("1i") / 96.0,
         )
         canvas.pack(side=tkinter.LEFT, fill=tkinter.BOTH, expand=tkinter.TRUE)
         vscrollbar.config(command=canvas.yview)
