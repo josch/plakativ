@@ -46,7 +46,7 @@ except ImportError:
     tkinter.Menubutton = dummy
     tkinter.LabelFrame = dummy
 
-VERSION = "0.4"
+VERSION = "0.5"
 
 PAGE_SIZES = OrderedDict(
     [
