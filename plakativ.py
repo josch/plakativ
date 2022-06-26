@@ -326,17 +326,30 @@ class Plakativ:
         return len(self.doc)
 
     def get_input_page_size(self):
-        width = self.doc[self.pagenr].getDisplayList().rect.width
-        height = self.doc[self.pagenr].getDisplayList().rect.height
-        return (width, height)
+        # since pymupdf 1.19.0 a warning will be issued if the deprecated names are used
+        if hasattr(self.doc[self.pagenr], "get_displaylist"):
+            gdl = self.doc[self.pagenr].get_displaylist
+        else:
+            gdl = self.doc[self.pagenr].getDisplayList
+        rect = gdl().rect
+        return (rect.width, rect.height)
 
     def get_image(self, zoom):
         mat_0 = fitz.Matrix(zoom, zoom)
-        pix = (
-            self.doc[self.pagenr].getDisplayList().getPixmap(matrix=mat_0, alpha=False)
-        )
-        # the getImageData() function was only introduced in pymupdf 1.14.5
+        # since pymupdf 1.19.0 a warning will be issued if the deprecated names are used
+        if hasattr(self.doc[self.pagenr], "get_displaylist"):
+            gdl = self.doc[self.pagenr].get_displaylist()
+        else:
+            gdl = self.doc[self.pagenr].getDisplayList()
+        if hasattr(gdl, "get_pixmap"):
+            pix = gdl.get_pixmap(matrix=mat_0, alpha=False)
+        else:
+            pix = gdl.getPixmap(matrix=mat_0, alpha=False)
+        if hasattr(pix, "tobytes"):
+            # getImageData was deprecated in pymupdf 1.19.0
+            return pix.tobytes("ppm")
         if hasattr(pix, "getImageData"):
+            # the getImageData() function was only introduced in pymupdf 1.14.5
             return pix.getImageData("ppm")
         else:
             # this is essentially the same thing that the getImageData()
@@ -369,8 +382,14 @@ class Plakativ:
         printable_height = self.layout["output_pagesize"][1] - (
             border_top + border_bottom
         )
-        inpage_width = pt_to_mm(self.doc[self.pagenr].getDisplayList().rect.width)
-        inpage_height = pt_to_mm(self.doc[self.pagenr].getDisplayList().rect.height)
+        # since pymupdf 1.19.0 a warning will be issued if the deprecated names are used
+        if hasattr(self.doc[self.pagenr], "get_displaylist"):
+            gdl = self.doc[self.pagenr].get_displaylist
+        else:
+            gdl = self.doc[self.pagenr].getDisplayList
+        rect = gdl().rect
+        inpage_width = pt_to_mm(rect.width)
+        inpage_height = pt_to_mm(rect.height)
 
         if mode in ["size", "mult"]:
             if mode == "size":
@@ -625,7 +644,12 @@ class Plakativ:
         if not hasattr(self, "layout"):
             raise LayoutNotComputedException()
 
-        inpage_width = pt_to_mm(self.doc[self.pagenr].getDisplayList().rect.width)
+        # since pymupdf 1.19.0 a warning will be issued if the deprecated names are used
+        if hasattr(self.doc[self.pagenr], "get_displaylist"):
+            gdl = self.doc[self.pagenr].get_displaylist
+        else:
+            gdl = self.doc[self.pagenr].getDisplayList
+        inpage_width = pt_to_mm(gdl().rect.width)
 
         outdoc = fitz.open()
 
@@ -644,7 +668,13 @@ class Plakativ:
                 )
                 / (self.layout["overallsize"][1]),
             )
-            page = outdoc.newPage(
+            # since pymupdf 1.19.0 a warning will be issued if the deprecated names are used
+            if hasattr(outdoc, "new_page"):
+                np = outdoc.new_page
+            else:
+                np = outdoc.newPage
+
+            page = np(
                 -1,  # insert after last page
                 width=mm_to_pt(self.layout["output_pagesize"][0]),
                 height=mm_to_pt(self.layout["output_pagesize"][1]),
@@ -674,7 +704,10 @@ class Plakativ:
                     bottom = self.layout["border_right"] * zoom_1
                     left = self.layout["border_bottom"] * zoom_1
                 # inner rectangle
-                shape = page.newShape()
+                if hasattr(page, "new_shape"):
+                    shape = page.new_shape()
+                else:
+                    shape = page.newShape()
                 shape.drawRect(
                     fitz.Rect(
                         x0,
@@ -714,7 +747,12 @@ class Plakativ:
             else:
                 page_width = mm_to_pt(self.layout["output_pagesize"][1])
                 page_height = mm_to_pt(self.layout["output_pagesize"][0])
-            page = outdoc.newPage(
+            # since pymupdf 1.19.0 a warning will be issued if the deprecated names are used
+            if hasattr(outdoc, "new_page"):
+                np = outdoc.new_page
+            else:
+                np = outdoc.newPage
+            page = np(
                 -1, width=page_width, height=page_height  # insert after last page
             )
 
@@ -758,14 +796,22 @@ class Plakativ:
                 mm_to_pt(factor * (target_y + target_height)),
             )
 
-            page.showPDFpage(
+            # since pymupdf 1.19.0 a warning will be issued if the deprecated names are used
+            if hasattr(page, "show_pdf_page"):
+                spp = page.show_pdf_page
+            else:
+                spp = page.showPDFpage
+            spp(
                 targetrect,  # fill the whole page
                 self.doc,  # input document
                 self.pagenr,  # input page number
                 clip=sourcerect,  # part of the input page to use
             )
 
-            shape = page.newShape()
+            if hasattr(page, "new_shape"):
+                shape = page.new_shape()
+            else:
+                shape = page.newShape()
             if guides:
                 if portrait:
                     shape.drawRect(

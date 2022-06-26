@@ -149,8 +149,8 @@ def test_cases(postersize, input_pagesize, output_pagesize, strategy, expected):
     height = mm_to_pt(input_pagesize[1])
 
     doc = fitz.open()
-    page = doc.newPage(pno=-1, width=width, height=height)
-    img = page.newShape()
+    page = doc.new_page(pno=-1, width=width, height=height)
+    img = page.new_shape()
 
     red = fitz.utils.getColor("red")
     green = fitz.utils.getColor("green")
@@ -189,7 +189,7 @@ def test_cases(postersize, input_pagesize, output_pagesize, strategy, expected):
 
     doc = fitz.open(outfile)
 
-    for pnum, (bbox, matrix) in zip(range(doc.pageCount), expected):
+    for pnum, (bbox, matrix) in zip(range(doc.page_count), expected):
         xreflist = doc._getPageInfo(pnum, 3)
         assert len(xreflist) >= 1
         xref, name, _, _ = xreflist[0]
@@ -209,7 +209,7 @@ def test_cases(postersize, input_pagesize, output_pagesize, strategy, expected):
         #      >>
         keyvals = dict(
             tuple(line.strip().split(maxsplit=1))
-            for line in doc.xrefObject(xref).splitlines()
+            for line in doc.xref_object(xref).splitlines()
             if " " in line.strip()
         )
         assert "/BBox" in keyvals
