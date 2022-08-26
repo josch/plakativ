@@ -387,6 +387,10 @@ class Plakativ:
             gdl = self.doc[self.pagenr].get_displaylist
         else:
             gdl = self.doc[self.pagenr].getDisplayList
+        # this may fail with "RuntimeError: image is too wide"
+        # from pdf_load_image_imp() in pdf-image.c from mupdf for sizes larger
+        # than 1<<16 pixels:
+        # https://bugs.ghostscript.com/show_bug.cgi?id=703839
         rect = gdl().rect
         inpage_width = pt_to_mm(rect.width)
         inpage_height = pt_to_mm(rect.height)
