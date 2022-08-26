@@ -1034,7 +1034,10 @@ class Application(tkinter.Frame):
         top_frame = tkinter.Frame(frame_right)
         top_frame.pack(fill=tkinter.X)
 
-        tkinter.Button(top_frame, text="Open PDF", command=self.on_open_button).pack(
+        button_text = "Open PDF"
+        if have_img2pdf:
+            button_text = "Open PDF, JPG, PNG, TIF"
+        tkinter.Button(top_frame, text=button_text, command=self.on_open_button).pack(
             side=tkinter.LEFT, expand=tkinter.TRUE, fill=tkinter.X
         )
         tkinter.Button(top_frame, text="Help", state=tkinter.DISABLED).pack(
@@ -1188,10 +1191,13 @@ class Application(tkinter.Frame):
         self.canvas.delete(tkinter.ALL)
 
         if not hasattr(self, "plakativ"):
+            button_text = "Open PDF"
+            if have_img2pdf:
+                button_text = "Open PDF, JPG, PNG, TIF"
             self.canvas.create_text(
                 self.canvas_size[0] / 2,
                 self.canvas_size[1] / 2,
-                text='Click on the "Open PDF" button in the upper right.',
+                text='Click on the "%s" button in the upper right.' % button_text,
                 fill="white",
             )
             return
