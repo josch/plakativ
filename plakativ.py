@@ -712,7 +712,11 @@ class Plakativ:
                     shape = page.new_shape()
                 else:
                     shape = page.newShape()
-                shape.drawRect(
+                if hasattr(shape, "draw_rect"):
+                    dr = shape.draw_rect
+                else:
+                    dr = shape.drawRect
+                dr(
                     fitz.Rect(
                         x0,
                         y0,
@@ -722,7 +726,7 @@ class Plakativ:
                 )
                 shape.finish(color=(0, 0, 1))
                 # outer rectangle
-                shape.drawRect(
+                dr(
                     fitz.Rect(
                         x0 - left,
                         y0 - top,
@@ -816,9 +820,13 @@ class Plakativ:
                 shape = page.new_shape()
             else:
                 shape = page.newShape()
+            if hasattr(shape, "draw_rect"):
+                dr = shape.draw_rect
+            else:
+                dr = shape.drawRect
             if guides:
                 if portrait:
-                    shape.drawRect(
+                    dr(
                         fitz.Rect(
                             mm_to_pt(self.layout["border_left"]),
                             mm_to_pt(self.layout["border_top"]),
@@ -827,7 +835,7 @@ class Plakativ:
                         )
                     )
                 else:
-                    shape.drawRect(
+                    dr(
                         fitz.Rect(
                             mm_to_pt(self.layout["border_bottom"]),
                             mm_to_pt(self.layout["border_left"]),
@@ -863,7 +871,7 @@ class Plakativ:
                     )
             if border:
                 if portrait:
-                    shape.drawRect(
+                    dr(
                         fitz.Rect(
                             mm_to_pt(self.layout["border_left"] - x),
                             mm_to_pt(self.layout["border_top"] - y),
@@ -880,7 +888,7 @@ class Plakativ:
                         )
                     )
                 else:
-                    shape.drawRect(
+                    dr(
                         fitz.Rect(
                             mm_to_pt(self.layout["border_bottom"] - x),
                             mm_to_pt(self.layout["border_left"] - y),
