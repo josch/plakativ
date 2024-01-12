@@ -272,7 +272,7 @@ def complex_cover(n, m, x, y):
                         if X4 > 0 and Y4 > 0:
                             simple_config, (sx, sy) = simple_cover(X4, Y4, x, y)
                             # shift the results such that they are in the center
-                            for (cx, cy, p) in simple_config:
+                            for cx, cy, p in simple_config:
                                 newconfig.append(
                                     (
                                         w0 * X(r, 0) + (X4 - sx) / 2 + cx,
@@ -286,7 +286,7 @@ def complex_cover(n, m, x, y):
                             if X4 > 0 and Y4 > 0:
                                 simple_config, (sx, sy) = simple_cover(X4, Y4, x, y)
                                 # shift the results such that they are in the center
-                                for (cx, cy, p) in simple_config:
+                                for cx, cy, p in simple_config:
                                     newconfig.append(
                                         (
                                             w3 * X(r, 3) + (X4 - sx) / 2 + cx,
@@ -598,7 +598,7 @@ class Plakativ:
                 # the computed positions and storing the largest border size in
                 # each dimension
                 poster_top = poster_right = poster_bottom = poster_left = 0
-                for (posx, posy, p) in self.layout["positions"]:
+                for posx, posy, p in self.layout["positions"]:
                     if p:
                         top = posy - border_top
                         if top < 0 and -top > poster_top:
@@ -1270,7 +1270,7 @@ class Application(tkinter.Frame):
 
         # draw rectangles
         # TODO: also draw numbers indicating the page number
-        for (x, y, portrait) in self.plakativ.layout["positions"]:
+        for x, y, portrait in self.plakativ.layout["positions"]:
             x0 = (x + self.plakativ.layout["posterpos"][0]) * zoom_1 + (
                 self.canvas_size[0] - zoom_1 * self.plakativ.layout["overallsize"][0]
             ) / 2
@@ -1714,6 +1714,7 @@ class BorderSizeWidget(tkinter.LabelFrame):
             ]
         ):
             self.variables[n] = tkinter.DoubleVar()
+
             # need to pass k and v as function arguments so that their value
             # does not get overwritten each loop iteration
             def callback(varname, idx, op, k_copy=n, v_copy=self.variables[n]):
