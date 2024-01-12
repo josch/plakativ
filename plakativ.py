@@ -25,6 +25,11 @@ import logging
 
 have_img2pdf = True
 try:
+    from PIL import Image
+
+    # ignore PIL limit because this software is meant to create posters which
+    # naturally can be very large in size
+    Image.MAX_IMAGE_PIXELS = None
     import img2pdf
 except ImportError:
     have_img2pdf = False
@@ -1353,8 +1358,6 @@ class Application(tkinter.Frame):
                 )
                 # remove alpha channel
                 if remove_alpha:
-                    from PIL import Image
-
                     img = Image.open(self.filename).convert("RGBA")
                     background = Image.new("RGBA", img.size, (255, 255, 255))
                     img = Image.alpha_composite(background, img)
