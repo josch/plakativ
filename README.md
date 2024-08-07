@@ -48,9 +48,8 @@ Plakativ is available from pypi: https://pypi.org/project/plakativ/
 Thus you can just run `pip install plakativ` on your platform of choice.
 
 For Microsoft Windows users, PyInstaller based .exe files are produced by
-appveyor. If you don't want to install Python before using plakativ you can
-head to appveyor and click on "Artifacts" to download the latest version:
-https://ci.appveyor.com/project/josch/plakativ
+appveyor. The resulting artifacts are attached to each release:
+https://gitlab.mister-muffin.de/josch/plakativ/releases
 
 Complex Layouter
 ================
