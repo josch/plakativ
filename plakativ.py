@@ -740,7 +740,7 @@ class Plakativ:
                     )
                 )
                 shape.finish(color=(1, 0, 0))
-                shape.insert_textbox(
+                shape.insertTextbox(
                     fitz.Rect(
                         x0 + 5,
                         y0 + 5,
@@ -851,7 +851,7 @@ class Plakativ:
                 shape.finish(width=0.2, color=(0.5, 0.5, 0.5), dashes="[5 6 1 6] 0")
             if numbers:
                 if portrait:
-                    shape.insert_textbox(
+                    shape.insertTextbox(
                         fitz.Rect(
                             mm_to_pt(self.layout["border_left"]) + 5,
                             mm_to_pt(self.layout["border_top"]) + 5,
@@ -863,7 +863,7 @@ class Plakativ:
                         color=(0.5, 0.5, 0.5),
                     )
                 else:
-                    shape.insert_textbox(
+                    shape.insertTextbox(
                         fitz.Rect(
                             mm_to_pt(self.layout["border_bottom"]) + 5,
                             mm_to_pt(self.layout["border_left"]) + 5,
